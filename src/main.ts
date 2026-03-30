@@ -55,11 +55,11 @@ topBarEl.appendChild(selectBtn);
 // Sidebar toolbar (shapes + joints)
 const toolbar = new Toolbar(sidebarEl, selectBtn, statusBar);
 
-let inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar);
+let inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
 
-// --- Play: capture snapshot before first step ---
+// --- Play: capture snapshot on first play press per edit session ---
 controls.onPlay(() => {
-  snapshot.capture(physicsWorld.world);
+  snapshot.captureIfNeeded(physicsWorld.world);
   controls.enableRevert();
 });
 
@@ -68,7 +68,7 @@ controls.onRevert(() => {
   const restoredWorld = snapshot.restore();
   if (!restoredWorld) return;
   physicsWorld = PhysicsWorld.fromWorld(restoredWorld, DEFAULT_WORLD_SETTINGS);
-  inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar);
+  inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
 });
 
 // --- Reset: discard everything and rebuild the initial scene ---
@@ -76,7 +76,7 @@ controls.onReset(() => {
   snapshot.clear();
   physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
   buildInitialScene();
-  inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar);
+  inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
 });
 
 // --- Mouse wheel zoom ---

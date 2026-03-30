@@ -2,6 +2,7 @@ import * as planck from 'planck';
 import { Renderer } from '../rendering/renderer';
 import { Toolbar, ToolType } from './toolbar';
 import { StatusBar } from './statusbar';
+import { SelectTool } from './selectTool';
 
 // Default physical properties for newly placed bodies
 const DEFAULT_DENSITY = 1.0;
@@ -42,19 +43,22 @@ export class InputHandler {
   private statusBar: StatusBar;
   private state: PlacementState = { phase: 'idle' };
   private previewFn: (() => void) | null = null;
+  private selectTool: SelectTool;
 
   constructor(
     canvas: HTMLCanvasElement,
     world: planck.World,
     renderer: Renderer,
     toolbar: Toolbar,
-    statusBar: StatusBar
+    statusBar: StatusBar,
+    isSimulationRunning: () => boolean
   ) {
     this.canvas = canvas;
     this.world = world;
     this.renderer = renderer;
     this.toolbar = toolbar;
     this.statusBar = statusBar;
+    this.selectTool = new SelectTool(world, renderer, isSimulationRunning);
 
     this.toolbar.onChange((tool) => this.onToolChanged(tool));
     this.onToolChanged(this.toolbar.getCurrentTool());
@@ -65,8 +69,9 @@ export class InputHandler {
     window.addEventListener('keydown',   (e) => this.onKeyDown(e));
   }
 
-  /** Called each frame by the render loop to draw in-progress placement previews. */
+  /** Called each frame by the render loop to draw selection highlights and placement previews. */
   drawPreview(): void {
+    this.selectTool.drawSelection();
     if (this.previewFn) this.previewFn();
   }
 
@@ -76,6 +81,7 @@ export class InputHandler {
   }
 
   private onToolChanged(tool: ToolType): void {
+    this.selectTool.deactivate();
     this.state = { phase: 'idle' };
     this.previewFn = null;
     this.updateStatusBar(tool);
@@ -102,6 +108,10 @@ export class InputHandler {
     const tool = this.toolbar.getCurrentTool();
 
     switch (tool) {
+      case 'select':
+        this.selectTool.onMouseDown(wp);
+        return;
+
       case 'circle':
         this.state = { phase: 'circle-dragging', startWorld: wp, startCanvas: cp };
         break;
@@ -130,6 +140,11 @@ export class InputHandler {
     const cp = this.canvasPos(e);
     const wp = this.renderer.canvasToWorld(cp.x, cp.y);
 
+    if (this.toolbar.getCurrentTool() === 'select') {
+      this.selectTool.onMouseMove(wp);
+      return;
+    }
+
     switch (this.state.phase) {
       case 'circle-dragging':
         this.updateCirclePreview(cp);
@@ -157,6 +172,11 @@ export class InputHandler {
     if (e.button !== 0) return;
     const cp = this.canvasPos(e);
     const wp = this.renderer.canvasToWorld(cp.x, cp.y);
+
+    if (this.toolbar.getCurrentTool() === 'select') {
+      this.selectTool.onMouseUp();
+      return;
+    }
 
     if (this.state.phase === 'circle-dragging') {
       const dragPx = Math.hypot(cp.x - this.state.startCanvas.x, cp.y - this.state.startCanvas.y);
