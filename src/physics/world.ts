@@ -53,6 +53,19 @@ export class PhysicsWorld {
     this.registerEventHooks();
   }
 
+  /**
+   * Wrap an existing planck.js World (e.g. one restored from a snapshot)
+   * in a new PhysicsWorld, re-registering all event hooks on it.
+   */
+  static fromWorld(existingWorld: planck.World, settings: WorldSettings = DEFAULT_WORLD_SETTINGS): PhysicsWorld {
+    const pw = Object.create(PhysicsWorld.prototype) as PhysicsWorld;
+    (pw as any).world = existingWorld;
+    (pw as any).settings = { ...settings };
+    (pw as any).onCollisionCallbacks = [];
+    pw['registerEventHooks']();
+    return pw;
+  }
+
   private registerEventHooks(): void {
     // Trigger collision sounds
     this.world.on('begin-contact', (contact) => {

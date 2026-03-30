@@ -1,17 +1,11 @@
 import * as planck from 'planck';
 import { PhysicsWorld, DEFAULT_WORLD_SETTINGS } from './physics/world';
+import { WorldSnapshot } from './physics/snapshot';
 import { Renderer, DEFAULT_RENDER_SETTINGS } from './rendering/renderer';
 import { Toolbar } from './ui/toolbar';
 import { StatusBar } from './ui/statusbar';
+import { SimulationControls } from './ui/controls';
 import { InputHandler } from './ui/input';
-
-// --- Physics setup ---
-const physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
-const world = physicsWorld.world;
-
-// --- Test scene: a ground platform ---
-const ground = world.createBody({ type: 'static', position: planck.Vec2(0, -5) });
-ground.createFixture({ shape: new planck.BoxShape(10, 0.5) });
 
 // --- Canvas: fill the container ---
 const canvas = document.getElementById('simulation-canvas') as HTMLCanvasElement;
@@ -23,15 +17,67 @@ function resizeCanvas(): void {
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
+// --- Physics setup ---
+let physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
+const snapshot = new WorldSnapshot();
+
+function buildInitialScene(): void {
+  const ground = physicsWorld.world.createBody({ type: 'static', position: planck.Vec2(0, -5) });
+  ground.createFixture({ shape: new planck.BoxShape(10, 0.5) });
+}
+buildInitialScene();
+
 // --- Renderer ---
 const renderer = new Renderer(canvas, DEFAULT_RENDER_SETTINGS);
 
-// --- UI ---
-const toolbarEl = document.getElementById('toolbar') as HTMLElement;
+// --- Build UI ---
+const topBarEl    = document.getElementById('top-bar') as HTMLElement;
+const sidebarEl   = document.getElementById('sidebar') as HTMLElement;
 const statusBarEl = document.getElementById('status-bar') as HTMLElement;
-const toolbar = new Toolbar(toolbarEl);
+
+// StatusBar must be created first so controls and toolbar can attach hints to it
 const statusBar = new StatusBar(statusBarEl);
-const inputHandler = new InputHandler(canvas, world, renderer, toolbar, statusBar);
+
+// Simulation controls (play/pause, revert, reset) go in the top bar
+const controls = new SimulationControls(topBarEl, statusBar);
+
+// Separator between controls and select
+const sep = document.createElement('div');
+sep.className = 'separator';
+topBarEl.appendChild(sep);
+
+// Select button lives in the top bar but is managed by Toolbar for active state
+const selectBtn = document.createElement('button');
+selectBtn.className = 'top-btn';
+selectBtn.textContent = '↖ Select';
+topBarEl.appendChild(selectBtn);
+
+// Sidebar toolbar (shapes + joints)
+const toolbar = new Toolbar(sidebarEl, selectBtn, statusBar);
+
+let inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar);
+
+// --- Play: capture snapshot before first step ---
+controls.onPlay(() => {
+  snapshot.capture(physicsWorld.world);
+  controls.enableRevert();
+});
+
+// --- Revert: restore world to pre-play snapshot ---
+controls.onRevert(() => {
+  const restoredWorld = snapshot.restore();
+  if (!restoredWorld) return;
+  physicsWorld = PhysicsWorld.fromWorld(restoredWorld, DEFAULT_WORLD_SETTINGS);
+  inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar);
+});
+
+// --- Reset: discard everything and rebuild the initial scene ---
+controls.onReset(() => {
+  snapshot.clear();
+  physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
+  buildInitialScene();
+  inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar);
+});
 
 // --- Mouse wheel zoom ---
 canvas.addEventListener('wheel', (e) => {
@@ -66,17 +112,11 @@ window.addEventListener('mouseup', (e) => {
 });
 
 // --- Simulation + render loop ---
-let running = true;
-
 function loop(): void {
-  if (running) physicsWorld.step();
-  renderer.draw(world);
+  if (controls.isRunning()) physicsWorld.step();
+  renderer.draw(physicsWorld.world);
   inputHandler.drawPreview();
   requestAnimationFrame(loop);
 }
-
-export function startSimulation(): void { running = true; }
-export function pauseSimulation(): void { running = false; }
-export function isRunning(): boolean { return running; }
 
 requestAnimationFrame(loop);

@@ -17,40 +17,90 @@
         overflow: hidden;
       }
 
-      #toolbar {
+      /* ── Top bar: simulation controls + select ── */
+      #top-bar {
         display: flex;
-        flex-wrap: wrap;
+        align-items: center;
         gap: 6px;
-        padding: 6px 8px;
+        padding: 6px 10px;
         background: #222;
         border-bottom: 1px solid #444;
+        flex-shrink: 0;
       }
 
-      .toolbar-group {
-        display: flex;
-        gap: 4px;
-        border-right: 1px solid #444;
-        padding-right: 6px;
-      }
-
-      .toolbar-group:last-child {
-        border-right: none;
-      }
-
-      .toolbar-btn {
+      #top-bar .top-btn {
         background: #333;
         color: #ccc;
         border: 1px solid #555;
         border-radius: 4px;
-        padding: 4px 10px;
+        padding: 4px 14px;
         cursor: pointer;
         font-size: 13px;
         white-space: nowrap;
       }
 
-      .toolbar-btn:hover { background: #444; color: #fff; }
-      .toolbar-btn.active { background: #556; color: #fff; border-color: #88f; }
+      #top-bar .top-btn:hover  { background: #444; color: #fff; }
+      #top-bar .top-btn.active { background: #556; color: #fff; border-color: #88f; }
+      #top-bar .top-btn:disabled { opacity: 0.35; cursor: default; }
 
+      #top-bar .separator {
+        width: 1px;
+        height: 22px;
+        background: #444;
+        margin: 0 4px;
+      }
+
+      /* ── Main area: sidebar + canvas ── */
+      #main {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* ── Left sidebar: shape + joint tools ── */
+      #sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 8px 6px;
+        background: #1c1c1c;
+        border-right: 1px solid #444;
+        overflow-y: auto;
+        flex-shrink: 0;
+        width: 130px;
+      }
+
+      .sidebar-group-label {
+        font-size: 10px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 6px 4px 2px;
+      }
+
+      .sidebar-group-label:first-child {
+        padding-top: 2px;
+      }
+
+      .sidebar-btn {
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 5px 8px;
+        cursor: pointer;
+        font-size: 12px;
+        text-align: left;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .sidebar-btn:hover  { background: #383838; color: #fff; }
+      .sidebar-btn.active { background: #334; color: #fff; border-color: #88f; }
+
+      /* ── Canvas area ── */
       #canvas-container {
         flex: 1;
         position: relative;
@@ -64,6 +114,7 @@
         cursor: crosshair;
       }
 
+      /* ── Status bar ── */
       #status-bar {
         padding: 4px 10px;
         background: #1a1a1a;
@@ -71,13 +122,17 @@
         font-size: 12px;
         color: #aaa;
         min-height: 24px;
+        flex-shrink: 0;
       }
     </style>
   </head>
   <body>
-    <div id="toolbar"></div>
-    <div id="canvas-container">
-      <canvas id="simulation-canvas"></canvas>
+    <div id="top-bar"></div>
+    <div id="main">
+      <div id="sidebar"></div>
+      <div id="canvas-container">
+        <canvas id="simulation-canvas"></canvas>
+      </div>
     </div>
     <div id="status-bar"></div>
     <script type="module" src="/src/main.ts"></script>
