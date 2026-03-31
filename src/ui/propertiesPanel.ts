@@ -1,6 +1,39 @@
 import * as planck from 'planck';
 import { BodyUserData } from '../types/userData';
 
+/** Common musical notes for the collision-sound frequency picker. */
+const MUSICAL_NOTES: Array<{ label: string; hz: number }> = [
+  { label: 'A3',  hz:  220.00 },
+  { label: 'B3',  hz:  246.94 },
+  { label: 'C4',  hz:  261.63 },
+  { label: 'D4',  hz:  293.66 },
+  { label: 'E4',  hz:  329.63 },
+  { label: 'F4',  hz:  349.23 },
+  { label: 'G4',  hz:  392.00 },
+  { label: 'A4',  hz:  440.00 },
+  { label: 'B4',  hz:  493.88 },
+  { label: 'C5',  hz:  523.25 },
+  { label: 'D5',  hz:  587.33 },
+  { label: 'E5',  hz:  659.25 },
+  { label: 'G5',  hz:  783.99 },
+  { label: 'A5',  hz:  880.00 },
+  { label: 'C6',  hz: 1046.50 },
+];
+
+/** Default EM properties applied when a body has no EM data yet. */
+const DEFAULT_EM: NonNullable<BodyUserData['em']> = {
+  lambda:         0,
+  currentType:    'fixed',
+  current:        0,
+  frequencyHz:    1,
+  phaseDeg:       0,
+  resistance:     1,
+  wireDiameter:   0.001,
+  seriesV0:       0,
+  seriesFvHz:     1,
+  seriesPhiVDeg:  0,
+};
+
 export class PropertiesPanel {
   private container: HTMLElement;
   private currentBody: planck.Body | null = null;
@@ -28,26 +61,27 @@ export class PropertiesPanel {
   refresh(): void {}
 
   private rebuild(): void {
-    const body = this.currentBody!;
+    const body     = this.currentBody!;
     const userData = (body.getUserData() as BodyUserData) ?? {};
     this.container.innerHTML = '';
 
     this.addHeading('Body Properties');
 
-    // Color
+    // ── Appearance & type ────────────────────────────────────────────────────
+
     const color = userData.color ?? this.defaultColor(body);
     this.addColorPicker('Color', color, (val) => {
       this.setUserData(body, { color: val });
     });
 
-    // Type
     this.addDropdown('Type', ['dynamic', 'static', 'kinematic'], body.getType(), (val) => {
       body.setType(val as planck.BodyType);
     });
 
     this.addSeparator();
 
-    // Fixture properties — read from first fixture
+    // ── Fixture properties — read from first fixture ─────────────────────────
+
     const fixture = body.getFixtureList();
     if (fixture) {
       this.addSliderField('Friction',    fixture.getFriction(),    0, 1, 0.01, (val) => {
@@ -57,31 +91,47 @@ export class PropertiesPanel {
         for (let f = body.getFixtureList(); f; f = f.getNext()) f.setRestitution(val);
       });
       this.addNumberField('Density (kg/m²)', fixture.getDensity(), 0.01, (val) => {
-        for (let f = body.getFixtureList(); f; f = f.getNext()) {
-          f.setDensity(val);
-        }
+        for (let f = body.getFixtureList(); f; f = f.getNext()) f.setDensity(val);
         body.resetMassData();
       });
     }
 
     this.addSeparator();
 
-    // Body properties
-    this.addNumberField('Linear Damping',  body.getLinearDamping(),  0, (val) => body.setLinearDamping(val));
-    this.addNumberField('Angular Damping', body.getAngularDamping(), 0, (val) => body.setAngularDamping(val));
+    // ── Body dynamics ────────────────────────────────────────────────────────
+
+    this.addNumberField('Linear Damping',  body.getLinearDamping(),  0,    (val) => body.setLinearDamping(val));
+    this.addNumberField('Angular Damping', body.getAngularDamping(), 0,    (val) => body.setAngularDamping(val));
     this.addNumberField('Gravity Scale',   body.getGravityScale(),   null, (val) => body.setGravityScale(val));
     this.addCheckbox('Fixed Rotation', body.isFixedRotation(), (val) => body.setFixedRotation(val));
     this.addCheckbox('Bullet',         body.isBullet(),        (val) => body.setBullet(val));
 
     this.addSeparator();
 
-    // Advanced section
+    // ── Velocity & sleep ─────────────────────────────────────────────────────
+
+    this.buildVelocitySection(body);
+
+    this.addSeparator();
+
+    // ── Collision sound ──────────────────────────────────────────────────────
+
+    this.buildCollisionSoundSection(body, userData);
+
+    this.addSeparator();
+
+    // ── Electromagnetic properties ───────────────────────────────────────────
+
+    this.buildEmPropertiesSection(body, userData);
+
+    this.addSeparator();
+
+    // ── Advanced (collision filters) ─────────────────────────────────────────
+
     this.addCollapsible('Advanced', () => {
       this.addIntegerField('Group Index', fixture?.getFilterGroupIndex() ?? 0, (val) => {
         for (let f = body.getFixtureList(); f; f = f.getNext()) {
-          const filter = f.getFilterCategoryBits();
-          const mask   = f.getFilterMaskBits();
-          f.setFilterData({ groupIndex: val, categoryBits: filter, maskBits: mask });
+          f.setFilterData({ groupIndex: val, categoryBits: f.getFilterCategoryBits(), maskBits: f.getFilterMaskBits() });
         }
       });
       this.addLayerCheckboxes('Category Layers', fixture?.getFilterCategoryBits() ?? 1, (val) => {
@@ -97,11 +147,157 @@ export class PropertiesPanel {
     });
   }
 
+  // ── Section builders ──────────────────────────────────────────────────────
+
+  private buildVelocitySection(body: planck.Body): void {
+    // Track X/Y independently so each field can update the combined Vec2.
+    const vel   = body.getLinearVelocity();
+    let velX    = vel.x;
+    let velY    = vel.y;
+
+    this.addNumberField('Linear Velocity X (m/s)', velX, null, (val) => {
+      velX = val;
+      body.setLinearVelocity(planck.Vec2(velX, velY));
+    });
+    this.addNumberField('Linear Velocity Y (m/s)', velY, null, (val) => {
+      velY = val;
+      body.setLinearVelocity(planck.Vec2(velX, velY));
+    });
+    this.addNumberField('Angular Velocity (rad/s)', body.getAngularVelocity(), null, (val) => {
+      body.setAngularVelocity(val);
+    });
+    this.addCheckbox('Allow Sleep', body.isSleepingAllowed(), (val) => body.setSleepingAllowed(val));
+    this.addCheckbox('Active',      body.isActive(),          (val) => body.setActive(val));
+  }
+
+  private buildCollisionSoundSection(body: planck.Body, userData: BodyUserData): void {
+    this.addSubHeading('Collision Sound');
+
+    const sound = userData.collisionSound ?? {
+      enabled:     false,
+      frequencyHz: 440,
+      volume:      0.5,
+      durationMs:  100,
+    };
+
+    // Sub-container shown/hidden by the Enabled checkbox.
+    const subContainer = document.createElement('div');
+    subContainer.style.display = sound.enabled ? 'block' : 'none';
+
+    this.addCheckbox('Enabled', sound.enabled, (val) => {
+      const updated = { ...sound, enabled: val };
+      Object.assign(sound, updated);
+      this.setUserData(body, { collisionSound: updated });
+      subContainer.style.display = val ? 'block' : 'none';
+    });
+
+    // Populate sub-container.
+    const prev = this.container;
+    this.container = subContainer;
+
+    this.addFrequencyWithNotePicker('Frequency (Hz)', sound.frequencyHz, (val) => {
+      sound.frequencyHz = val;
+      this.setUserData(body, { collisionSound: { ...sound } });
+    });
+    this.addSliderField('Volume', sound.volume, 0, 1, 0.01, (val) => {
+      sound.volume = val;
+      this.setUserData(body, { collisionSound: { ...sound } });
+    });
+    this.addNumberField('Duration (ms)', sound.durationMs, 1, (val) => {
+      sound.durationMs = val;
+      this.setUserData(body, { collisionSound: { ...sound } });
+    });
+
+    this.container = prev;
+    this.container.appendChild(subContainer);
+  }
+
+  private buildEmPropertiesSection(body: planck.Body, userData: BodyUserData): void {
+    this.addSubHeading('EM Properties');
+
+    const em = { ...DEFAULT_EM, ...userData.em };
+
+    const save = () => this.setUserData(body, { em: { ...em } });
+
+    this.addNumberField('Charge λ (C/m)', em.lambda, null, (val) => {
+      em.lambda = val; save();
+    });
+
+    // ── Current type dropdown + conditional sub-fields ──────────────────────
+
+    // Sub-containers for sinusoidal-only and inductive-only fields.
+    const sinFields = document.createElement('div');
+    const indFields = document.createElement('div');
+
+    const applyVisibility = (type: string) => {
+      sinFields.style.display = (type === 'sinusoidal')            ? 'block' : 'none';
+      indFields.style.display = (type === 'inductive')             ? 'block' : 'none';
+    };
+    applyVisibility(em.currentType);
+
+    this.addDropdown(
+      'Current Type',
+      ['fixed', 'sinusoidal', 'inductive'],
+      em.currentType,
+      (val) => {
+        em.currentType = val as typeof em.currentType;
+        save();
+        applyVisibility(val);
+      }
+    );
+
+    // Current amplitude (used by all three types, but label differs for sinusoidal).
+    this.addNumberField('Current (A)', em.current, null, (val) => {
+      em.current = val; save();
+    });
+
+    // Sinusoidal-only fields.
+    const prev = this.container;
+
+    this.container = sinFields;
+    this.addNumberField('Frequency f (Hz)', em.frequencyHz, 0, (val) => {
+      em.frequencyHz = val; save();
+    });
+    this.addNumberField('Phase φ (°)', em.phaseDeg, null, (val) => {
+      em.phaseDeg = val; save();
+    });
+
+    // Inductive-only fields.
+    this.container = indFields;
+    this.addNumberField('Resistance R (Ω)', em.resistance, 0, (val) => {
+      em.resistance = val; save();
+    });
+    this.addNumberField('Wire Diameter d (m)', em.wireDiameter, 0, (val) => {
+      em.wireDiameter = val; save();
+    });
+    this.addSubHeading('Series Voltage Source');
+    this.addNumberField('Amplitude V₀ (V)', em.seriesV0, 0, (val) => {
+      em.seriesV0 = val; save();
+    });
+    this.addNumberField('Frequency f_v (Hz)', em.seriesFvHz, 0, (val) => {
+      em.seriesFvHz = val; save();
+    });
+    this.addNumberField('Phase φ_v (°)', em.seriesPhiVDeg, null, (val) => {
+      em.seriesPhiVDeg = val; save();
+    });
+
+    this.container = prev;
+    this.container.appendChild(sinFields);
+    this.container.appendChild(indFields);
+  }
+
   // ── Builder helpers ───────────────────────────────────────────────────────
 
   private addHeading(text: string): void {
     const h = document.createElement('div');
     h.className = 'prop-heading';
+    h.textContent = text;
+    this.container.appendChild(h);
+  }
+
+  private addSubHeading(text: string): void {
+    const h = document.createElement('div');
+    h.className = 'prop-subheading';
     h.textContent = text;
     this.container.appendChild(h);
   }
@@ -219,6 +415,55 @@ export class PropertiesPanel {
     this.container.appendChild(row);
   }
 
+  /**
+   * A number field for frequency, with a small musical-note dropdown alongside.
+   * Selecting a note snaps the frequency field to that note's Hz value.
+   */
+  private addFrequencyWithNotePicker(label: string, value: number, onChange: (val: number) => void): void {
+    const row = this.makeRow(label);
+
+    const freqInput = document.createElement('input');
+    freqInput.type  = 'number';
+    freqInput.min   = '1';
+    freqInput.step  = '1';
+    freqInput.value = String(value);
+    freqInput.className = 'prop-number-small';
+    freqInput.addEventListener('change', () => {
+      const v = parseFloat(freqInput.value);
+      if (!isNaN(v) && v > 0) {
+        noteSelect.value = '';  // deselect note if frequency was typed manually
+        onChange(v);
+      }
+    });
+
+    const noteSelect = document.createElement('select');
+    noteSelect.className = 'prop-select-small';
+
+    const placeholder = document.createElement('option');
+    placeholder.value   = '';
+    placeholder.textContent = '♩';
+    noteSelect.appendChild(placeholder);
+
+    for (const note of MUSICAL_NOTES) {
+      const opt = document.createElement('option');
+      opt.value       = String(note.hz);
+      opt.textContent = note.label;
+      noteSelect.appendChild(opt);
+    }
+
+    noteSelect.addEventListener('change', () => {
+      const hz = parseFloat(noteSelect.value);
+      if (!isNaN(hz)) {
+        freqInput.value = String(hz);
+        onChange(hz);
+      }
+    });
+
+    row.appendChild(freqInput);
+    row.appendChild(noteSelect);
+    this.container.appendChild(row);
+  }
+
   private addLayerCheckboxes(label: string, bits: number, onChange: (val: number) => void): void {
     const section = document.createElement('div');
     section.className = 'prop-layer-section';
@@ -250,10 +495,10 @@ export class PropertiesPanel {
       });
 
       const cell = document.createElement('div');
-      cell.style.display = 'flex';
+      cell.style.display       = 'flex';
       cell.style.flexDirection = 'column';
-      cell.style.alignItems = 'center';
-      cell.style.gap = '2px';
+      cell.style.alignItems    = 'center';
+      cell.style.gap           = '2px';
       cell.appendChild(lbl2);
       cell.appendChild(cb);
       grid.appendChild(cell);
@@ -274,7 +519,7 @@ export class PropertiesPanel {
     body.className = 'prop-collapsible-body';
     body.style.display = 'none';
 
-    let open = false;
+    let open  = false;
     let built = false;
 
     header.addEventListener('click', () => {
@@ -321,9 +566,7 @@ export class PropertiesPanel {
   }
 
   private toHexColor(color: string): string {
-    // If already a 6-digit hex, return as-is
     if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
-    // Fallback
     return '#e0e0ff';
   }
 }

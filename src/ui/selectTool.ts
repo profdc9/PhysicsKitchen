@@ -64,6 +64,22 @@ export class SelectTool {
     this.onSelectCallback = callback;
   }
 
+  /**
+   * Destroy the currently selected body and clear the selection.
+   * Returns true if a body was deleted, false if nothing was selected.
+   * The world's remove-body hook handles any application-level cleanup.
+   */
+  deleteSelected(): boolean {
+    if (!this.selectedBody) return false;
+    this.endDrag();
+    this.world.destroyBody(this.selectedBody);
+    // selectedBody is now a dangling reference — clear it before any callbacks fire
+    this.selectedBody = null;
+    this.handles.setBody(null);
+    this.onSelectCallback?.(null);
+    return true;
+  }
+
   /** Call when the select tool is deactivated to clean up state. */
   deactivate(): void {
     this.endDrag();

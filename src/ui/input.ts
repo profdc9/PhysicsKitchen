@@ -233,7 +233,21 @@ export class InputHandler {
           this.updateSegmentsPreview();
         }
       }
+
+    } else if (this.toolbar.getCurrentTool() === 'select') {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !this.isInputElementFocused()) {
+        e.preventDefault();
+        this.selectTool.deleteSelected();
+      }
     }
+  }
+
+  /** Returns true when a text-entry element has focus, so Delete/Backspace are not intercepted. */
+  private isInputElementFocused(): boolean {
+    const el = document.activeElement;
+    return el instanceof HTMLInputElement
+        || el instanceof HTMLTextAreaElement
+        || el instanceof HTMLSelectElement;
   }
 
   // ── Polygon logic ─────────────────────────────────────────────────────────

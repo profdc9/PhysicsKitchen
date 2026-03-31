@@ -44,10 +44,13 @@
 ### EM Properties Section
 - Lambda λ (linear charge density, C/m)
 - Current type (dropdown: fixed / sinusoidal / inductive)
-- Current (A) — shown for fixed and as amplitude I₀ for sinusoidal
-- Frequency ω (rad/s) and Phase φ (radians) — shown for sinusoidal only
-- Resistance R (Ω)
-- Wire diameter d (meters) — used for self-inductance; shown for inductive only
+- Current (A) — shown for fixed; amplitude I₀ (A) for sinusoidal
+- Frequency f (Hz) and Phase φ (degrees) — shown for sinusoidal only
+- **Inductive-only fields** (hidden for fixed/sinusoidal):
+  - Resistance R (Ω)
+  - Wire diameter d (meters) — used for self-inductance
+  - Series voltage source: amplitude V₀ (V), frequency f_v (Hz), phase φ_v (degrees)
+    — models a series oscillating voltage in the current loop; V₀ = 0 means purely passive
 
 ### Collapsible "Advanced" Section (hidden by default)
 - Collision layers: filterCategoryBits and filterMaskBits as checkboxes (Layer 1–8)

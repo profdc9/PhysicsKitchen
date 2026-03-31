@@ -19,6 +19,30 @@ export interface BodyUserData {
     volume: number;
     durationMs: number;
   };
+
+  /** Electromagnetic properties for this body. Absent means no EM participation. */
+  em?: {
+    /** Linear charge density λ (C/m) */
+    lambda: number;
+    /** How the current is driven */
+    currentType: 'fixed' | 'sinusoidal' | 'inductive';
+    /** Current I (A); for sinusoidal this is the amplitude I₀ */
+    current: number;
+    /** Oscillation frequency f (Hz) — sinusoidal only */
+    frequencyHz: number;
+    /** Phase φ (degrees) — sinusoidal only */
+    phaseDeg: number;
+    /** Wire resistance R (Ω) — inductive only */
+    resistance: number;
+    /** Wire diameter d (m) used for self-inductance — inductive only */
+    wireDiameter: number;
+    /** Series voltage source amplitude V₀ (V) — inductive only; 0 = purely passive */
+    seriesV0: number;
+    /** Series voltage frequency f_v (Hz) — inductive only */
+    seriesFvHz: number;
+    /** Series voltage phase φ_v (degrees) — inductive only */
+    seriesPhiVDeg: number;
+  };
 }
 
 /**

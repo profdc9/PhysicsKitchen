@@ -201,6 +201,18 @@
         text-align: right;
       }
 
+      /* Hide native spin buttons — too wide for compact number fields.
+         Values can still be incremented/decremented with keyboard arrow keys. */
+      .prop-number::-webkit-inner-spin-button,
+      .prop-number::-webkit-outer-spin-button,
+      .prop-number-small::-webkit-inner-spin-button,
+      .prop-number-small::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .prop-number,
+      .prop-number-small { -moz-appearance: textfield; }
+
       .prop-checkbox {
         accent-color: #88f;
         width: 14px;
@@ -234,6 +246,25 @@
 
       .prop-collapsible-body {
         padding-left: 4px;
+      }
+
+      .prop-subheading {
+        font-size: 10px;
+        font-weight: bold;
+        color: #777;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        padding: 4px 0 2px;
+      }
+
+      .prop-select-small {
+        width: 44px;
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        border-radius: 3px;
+        padding: 2px 2px;
+        font-size: 11px;
       }
 
       #simulation-canvas {

@@ -54,6 +54,14 @@ selectBtn.className = 'top-btn';
 selectBtn.textContent = '↖ Select';
 topBarEl.appendChild(selectBtn);
 
+// Delete button — enabled only while something is selected
+const deleteBtn = document.createElement('button');
+deleteBtn.className = 'top-btn';
+deleteBtn.textContent = '🗑 Delete';
+deleteBtn.disabled = true;
+deleteBtn.addEventListener('click', () => inputHandler.getSelectTool().deleteSelected());
+topBarEl.appendChild(deleteBtn);
+
 // Sidebar toolbar (shapes + joints)
 const toolbar = new Toolbar(sidebarEl, selectBtn, statusBar);
 
@@ -63,8 +71,8 @@ const propertiesPanel = new PropertiesPanel(propsPanelEl);
 function makeInputHandler(): InputHandler {
   const handler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
   handler.getSelectTool().onSelect((body) => {
-    if (body) propertiesPanel.show(body);
-    else propertiesPanel.hide();
+    if (body) { propertiesPanel.show(body); deleteBtn.disabled = false; }
+    else       { propertiesPanel.hide();    deleteBtn.disabled = true;  }
   });
   return handler;
 }
@@ -83,6 +91,7 @@ controls.onRevert(() => {
   if (!restoredWorld) return;
   physicsWorld = PhysicsWorld.fromWorld(restoredWorld, DEFAULT_WORLD_SETTINGS);
   propertiesPanel.hide();
+  deleteBtn.disabled = true;
   inputHandler = makeInputHandler();
 });
 
@@ -92,6 +101,7 @@ controls.onReset(() => {
   physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
   buildInitialScene();
   propertiesPanel.hide();
+  deleteBtn.disabled = true;
   inputHandler = makeInputHandler();
 });
 
