@@ -477,6 +477,33 @@ export class BodyHandles {
           // check that no vertex was lost before applying.
           if ((newShape as any).m_count === count) {
             recreateFixture(body, newShape, props);
+
+            // planck.js recenters polygon vertices around the area centroid, shifting
+            // each stored vertex by -C so the centroid is at the local origin.
+            // The body position must be updated by the same offset (in world space) to
+            // keep the shape where it was — otherwise the centroid drifts each drag step.
+            //
+            // Recover C by comparing newLocal (what we gave planck for the dragged vertex)
+            // to the nearest stored vertex (newLocal - C after planck's shift).
+            let nearestJ = 0, nearestDistSq = Infinity;
+            for (let j = 0; j < (newShape as any).m_count; j++) {
+              const v  = newShape.m_vertices[j];
+              const dx = v.x - newLocal.x;
+              const dy = v.y - newLocal.y;
+              const d2 = dx * dx + dy * dy;
+              if (d2 < nearestDistSq) { nearestDistSq = d2; nearestJ = j; }
+            }
+            const shiftLocalX = newLocal.x - newShape.m_vertices[nearestJ].x;
+            const shiftLocalY = newLocal.y - newShape.m_vertices[nearestJ].y;
+            const angle = body.getAngle();
+            const cos   = Math.cos(angle);
+            const sin   = Math.sin(angle);
+            const pos   = body.getPosition();
+            body.setPosition(planck.Vec2(
+              pos.x + shiftLocalX * cos - shiftLocalY * sin,
+              pos.y + shiftLocalX * sin + shiftLocalY * cos,
+            ));
+
             // Rebuild all handles so every handle index is correct after any hull reorder,
             // then update activeIndex to the handle closest to the mouse in the new shape.
             this.handles = this.buildHandles(body);
