@@ -4,8 +4,8 @@ import { BodyUserData } from '../types/userData';
 
 // ── Visual constants (all pixel measurements) ─────────────────────────────────
 
-const HANDLE_RADIUS_PX        = 6;
-const HANDLE_HIT_PX           = 12;    // larger than visual radius for easier grabbing
+const HANDLE_RADIUS_PX        = 8.5;
+const HANDLE_HIT_PX           = 17;    // larger than visual radius for easier grabbing
 const ROTATE_HANDLE_OFFSET_PX = 30;    // pixels above body center in canvas space
 const ROTATION_DEAD_ZONE_PX   = 8;     // must move this far before rotation begins
 const ROTATION_SNAP_RAD       = Math.PI / 4;  // 45° snap increments when Shift is held

@@ -8,6 +8,7 @@ const COLOR_STATIC = '#80c080';
 const COLOR_KINEMATIC = '#c0a0e0';
 const COLOR_STROKE = '#ffffff';
 const STROKE_WIDTH = 1.5;
+const LINE_STROKE_WIDTH = 3;   // heavier stroke for edge and chain shapes
 
 export function drawBodies(
   ctx: CanvasRenderingContext2D,
@@ -60,7 +61,7 @@ function drawFixture(
   }
 
   ctx.strokeStyle = COLOR_STROKE;
-  ctx.lineWidth = STROKE_WIDTH;
+  ctx.lineWidth = (shapeType === 'edge' || shapeType === 'chain') ? LINE_STROKE_WIDTH : STROKE_WIDTH;
   ctx.stroke();
 }
 

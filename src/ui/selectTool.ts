@@ -26,7 +26,7 @@ const DRAG_MAX_FORCE_MULTIPLIER = 1000.0; // multiplied by body mass
 const HIT_TEST_HALF_EXTENT = 0.01;
 
 // Click tolerance for edge/chain shapes in screen pixels — converted to world units at query time
-const LINE_HIT_PIXELS = 8;
+const LINE_HIT_PIXELS = 14;
 
 export class SelectTool {
   private world: planck.World;
