@@ -1,5 +1,6 @@
 import * as planck from 'planck';
 import { Renderer } from './renderer';
+import { BodyUserData } from '../types/userData';
 
 // Colors for each body type
 const COLOR_DYNAMIC = '#e0e0ff';
@@ -90,15 +91,15 @@ function drawPolygonShape(
   shape: planck.PolygonShape,
   renderer: Renderer
 ): void {
-  const vertices = shape.m_vertices;
-  if (vertices.length === 0) return;
+  const count = (shape as any).m_count as number;
+  if (count === 0) return;
 
-  const firstWorld = body.getWorldPoint(vertices[0]);
+  const firstWorld = body.getWorldPoint(shape.m_vertices[0]);
   const firstCanvas = renderer.worldToCanvas(firstWorld);
   ctx.moveTo(firstCanvas.x, firstCanvas.y);
 
-  for (let i = 1; i < vertices.length; i++) {
-    const worldPt = body.getWorldPoint(vertices[i]);
+  for (let i = 1; i < count; i++) {
+    const worldPt = body.getWorldPoint(shape.m_vertices[i]);
     const canvasPt = renderer.worldToCanvas(worldPt);
     ctx.lineTo(canvasPt.x, canvasPt.y);
   }
@@ -142,6 +143,8 @@ function drawChainShape(
 }
 
 function getBodyColor(body: planck.Body): string {
+  const userData = body.getUserData() as BodyUserData | null;
+  if (userData?.color) return userData.color;
   switch (body.getType()) {
     case 'static':    return COLOR_STATIC;
     case 'kinematic': return COLOR_KINEMATIC;

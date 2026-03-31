@@ -6,6 +6,7 @@ import { Toolbar } from './ui/toolbar';
 import { StatusBar } from './ui/statusbar';
 import { SimulationControls } from './ui/controls';
 import { InputHandler } from './ui/input';
+import { PropertiesPanel } from './ui/propertiesPanel';
 
 // --- Canvas: fill the container ---
 const canvas = document.getElementById('simulation-canvas') as HTMLCanvasElement;
@@ -34,6 +35,7 @@ const renderer = new Renderer(canvas, DEFAULT_RENDER_SETTINGS);
 const topBarEl    = document.getElementById('top-bar') as HTMLElement;
 const sidebarEl   = document.getElementById('sidebar') as HTMLElement;
 const statusBarEl = document.getElementById('status-bar') as HTMLElement;
+const propsPanelEl = document.getElementById('properties-panel') as HTMLElement;
 
 // StatusBar must be created first so controls and toolbar can attach hints to it
 const statusBar = new StatusBar(statusBarEl);
@@ -55,7 +57,19 @@ topBarEl.appendChild(selectBtn);
 // Sidebar toolbar (shapes + joints)
 const toolbar = new Toolbar(sidebarEl, selectBtn, statusBar);
 
-let inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
+// Properties panel (right side — shown when a body is selected)
+const propertiesPanel = new PropertiesPanel(propsPanelEl);
+
+function makeInputHandler(): InputHandler {
+  const handler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
+  handler.getSelectTool().onSelect((body) => {
+    if (body) propertiesPanel.show(body);
+    else propertiesPanel.hide();
+  });
+  return handler;
+}
+
+let inputHandler = makeInputHandler();
 
 // --- Play: capture snapshot on first play press per edit session ---
 controls.onPlay(() => {
@@ -68,7 +82,8 @@ controls.onRevert(() => {
   const restoredWorld = snapshot.restore();
   if (!restoredWorld) return;
   physicsWorld = PhysicsWorld.fromWorld(restoredWorld, DEFAULT_WORLD_SETTINGS);
-  inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
+  propertiesPanel.hide();
+  inputHandler = makeInputHandler();
 });
 
 // --- Reset: discard everything and rebuild the initial scene ---
@@ -76,7 +91,8 @@ controls.onReset(() => {
   snapshot.clear();
   physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
   buildInitialScene();
-  inputHandler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
+  propertiesPanel.hide();
+  inputHandler = makeInputHandler();
 });
 
 // --- Mouse wheel zoom ---
@@ -116,6 +132,7 @@ function loop(): void {
   if (controls.isRunning()) physicsWorld.step();
   renderer.draw(physicsWorld.world);
   inputHandler.drawPreview();
+  propertiesPanel.refresh();
   requestAnimationFrame(loop);
 }
 

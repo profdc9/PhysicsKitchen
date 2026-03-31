@@ -3,6 +3,7 @@ import { Renderer } from '../rendering/renderer';
 import { Toolbar, ToolType } from './toolbar';
 import { StatusBar } from './statusbar';
 import { SelectTool } from './selectTool';
+import { BodyUserData } from '../types/userData';
 
 // Default physical properties for newly placed bodies
 const DEFAULT_DENSITY = 1.0;
@@ -69,6 +70,10 @@ export class InputHandler {
     window.addEventListener('keydown',   (e) => this.onKeyDown(e));
   }
 
+  getSelectTool(): SelectTool {
+    return this.selectTool;
+  }
+
   /** Called each frame by the render loop to draw selection highlights and placement previews. */
   drawPreview(): void {
     this.selectTool.drawSelection();
@@ -109,7 +114,7 @@ export class InputHandler {
 
     switch (tool) {
       case 'select':
-        this.selectTool.onMouseDown(wp);
+        this.selectTool.onMouseDown(wp, cp);
         return;
 
       case 'circle':
@@ -141,7 +146,7 @@ export class InputHandler {
     const wp = this.renderer.canvasToWorld(cp.x, cp.y);
 
     if (this.toolbar.getCurrentTool() === 'select') {
-      this.selectTool.onMouseMove(wp);
+      this.selectTool.onMouseMove(wp, cp, e.shiftKey);
       return;
     }
 
@@ -467,6 +472,7 @@ export class InputHandler {
       friction: DEFAULT_FRICTION,
       restitution: DEFAULT_RESTITUTION,
     });
+    body.setUserData({ shapeKind: 'circle' } satisfies BodyUserData);
   }
 
   private placeBox(cornerA: planck.Vec2, cornerB: planck.Vec2): void {
@@ -481,6 +487,7 @@ export class InputHandler {
       friction: DEFAULT_FRICTION,
       restitution: DEFAULT_RESTITUTION,
     });
+    body.setUserData({ shapeKind: 'box' } satisfies BodyUserData);
   }
 
   private placeEdge(v1: planck.Vec2, v2: planck.Vec2): void {
@@ -489,6 +496,7 @@ export class InputHandler {
       shape: new planck.EdgeShape(v1, v2),
       friction: DEFAULT_FRICTION,
     });
+    body.setUserData({ shapeKind: 'edge' } satisfies BodyUserData);
   }
 
   private placePolygon(vertices: planck.Vec2[]): void {
@@ -505,6 +513,7 @@ export class InputHandler {
       friction: DEFAULT_FRICTION,
       restitution: DEFAULT_RESTITUTION,
     });
+    body.setUserData({ shapeKind: 'polygon' } satisfies BodyUserData);
   }
 
   private placeChain(vertices: planck.Vec2[]): void {
@@ -513,5 +522,6 @@ export class InputHandler {
       shape: new planck.ChainShape(vertices, false),
       friction: DEFAULT_FRICTION,
     });
+    body.setUserData({ shapeKind: 'chain' } satisfies BodyUserData);
   }
 }

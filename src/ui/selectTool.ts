@@ -1,13 +1,32 @@
 import * as planck from 'planck';
 import { Renderer } from '../rendering/renderer';
+import { BodyHandles, CanvasPt } from './bodyHandles';
 
-// MouseJoint parameters for dragging bodies
-const DRAG_FREQUENCY_HZ = 5.0;
-const DRAG_DAMPING_RATIO = 0.7;
+/** Squared distance from point p to the nearest point on segment (a, b). */
+function pointToSegmentDistSq(p: planck.Vec2, a: planck.Vec2, b: planck.Vec2): number {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const lenSq = abx * abx + aby * aby;
+  if (lenSq === 0) {
+    const dx = p.x - a.x; const dy = p.y - a.y;
+    return dx * dx + dy * dy;
+  }
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / lenSq));
+  const dx = p.x - (a.x + t * abx);
+  const dy = p.y - (a.y + t * aby);
+  return dx * dx + dy * dy;
+}
+
+// MouseJoint parameters for dragging bodies during simulation
+const DRAG_FREQUENCY_HZ        = 5.0;
+const DRAG_DAMPING_RATIO       = 0.7;
 const DRAG_MAX_FORCE_MULTIPLIER = 1000.0; // multiplied by body mass
 
 // How close the click AABB query half-extent is in world units
 const HIT_TEST_HALF_EXTENT = 0.01;
+
+// Click tolerance for edge/chain shapes in screen pixels — converted to world units at query time
+const LINE_HIT_PIXELS = 8;
 
 export class SelectTool {
   private world: planck.World;
@@ -15,6 +34,9 @@ export class SelectTool {
   private isSimulationRunning: () => boolean;
 
   private selectedBody: planck.Body | null = null;
+  private onSelectCallback: ((body: planck.Body | null) => void) | null = null;
+
+  private handles: BodyHandles;
 
   // MouseJoint used while dragging during simulation
   private dragAnchorBody: planck.Body;
@@ -28,6 +50,8 @@ export class SelectTool {
     this.renderer = renderer;
     this.isSimulationRunning = isSimulationRunning;
 
+    this.handles = new BodyHandles(renderer, isSimulationRunning);
+
     // A permanent static body used as the anchor for MouseJoint dragging
     this.dragAnchorBody = world.createBody({ type: 'static' });
   }
@@ -36,43 +60,60 @@ export class SelectTool {
     return this.selectedBody;
   }
 
+  onSelect(callback: (body: planck.Body | null) => void): void {
+    this.onSelectCallback = callback;
+  }
+
   /** Call when the select tool is deactivated to clean up state. */
   deactivate(): void {
     this.endDrag();
+    this.handles.setBody(null);
     this.selectedBody = null;
+    this.onSelectCallback?.(null);
   }
 
-  onMouseDown(worldPos: planck.Vec2): void {
-    const hit = this.hitTest(worldPos);
+  onMouseDown(worldPos: planck.Vec2, canvasPt: CanvasPt): void {
+    // Handle drags take priority over body drags, but only when paused
+    if (this.handles.onMouseDown(canvasPt)) return;
 
+    const hit = this.hitTest(worldPos);
     if (hit) {
       this.selectedBody = hit;
       this.beginDrag(hit, worldPos);
     } else {
       this.selectedBody = null;
     }
+    this.handles.setBody(this.selectedBody);
+    this.onSelectCallback?.(this.selectedBody);
   }
 
-  onMouseMove(worldPos: planck.Vec2): void {
-    if (this.mouseJoint) {
-      // Simulation running — update MouseJoint target
-      this.mouseJoint.setTarget(worldPos);
-    } else if (this.dragOffset && this.selectedBody) {
-      // Simulation paused — move body directly
-      const newPos = planck.Vec2(
-        worldPos.x - this.dragOffset.x,
-        worldPos.y - this.dragOffset.y
-      );
-      this.selectedBody.setPosition(newPos);
-      this.selectedBody.setAwake(true);
+  onMouseMove(worldPos: planck.Vec2, canvasPt: CanvasPt, shiftKey: boolean): void {
+    // Always forward to handles (updates hover highlight and applies active handle drags)
+    this.handles.onMouseMove(canvasPt, worldPos, shiftKey);
+
+    // Only apply body drag if no handle is being dragged
+    if (!this.handles.isDragging()) {
+      if (this.mouseJoint) {
+        // Simulation running — update MouseJoint target
+        this.mouseJoint.setTarget(worldPos);
+      } else if (this.dragOffset && this.selectedBody) {
+        // Simulation paused — move body directly
+        const newPos = planck.Vec2(
+          worldPos.x - this.dragOffset.x,
+          worldPos.y - this.dragOffset.y,
+        );
+        this.selectedBody.setPosition(newPos);
+        this.selectedBody.setAwake(true);
+      }
     }
   }
 
   onMouseUp(): void {
+    this.handles.onMouseUp();
     this.endDrag();
   }
 
-  /** Draw a highlight outline around the selected body. */
+  /** Draw a highlight outline around the selected body, then draw editing handles. */
   drawSelection(): void {
     if (!this.selectedBody) return;
 
@@ -88,46 +129,49 @@ export class SelectTool {
     }
 
     ctx.restore();
+
+    // Handles draw on top of the selection outline
+    this.handles.draw();
   }
 
   private drawFixtureHighlight(
     ctx: CanvasRenderingContext2D,
     body: planck.Body,
-    fixture: planck.Fixture
+    fixture: planck.Fixture,
   ): void {
     const shape = fixture.getShape();
-    const type = shape.getType();
+    const type  = shape.getType();
 
     ctx.beginPath();
 
     if (type === 'circle') {
-      const s = shape as planck.CircleShape;
+      const s      = shape as planck.CircleShape;
       const center = body.getWorldPoint(s.getCenter());
-      const cp = this.renderer.worldToCanvas(center);
-      const r = this.renderer.worldLengthToPixels(s.getRadius());
+      const cp     = this.renderer.worldToCanvas(center);
+      const r      = this.renderer.worldLengthToPixels(s.getRadius());
       ctx.arc(cp.x, cp.y, r + 3, 0, Math.PI * 2);
 
     } else if (type === 'polygon') {
-      const s = shape as planck.PolygonShape;
-      const verts = s.m_vertices;
-      if (verts.length === 0) return;
-      const first = this.renderer.worldToCanvas(body.getWorldPoint(verts[0]));
+      const s     = shape as planck.PolygonShape;
+      const count = (s as any).m_count as number;
+      if (count === 0) return;
+      const first = this.renderer.worldToCanvas(body.getWorldPoint(s.m_vertices[0]));
       ctx.moveTo(first.x, first.y);
-      for (let i = 1; i < verts.length; i++) {
-        const p = this.renderer.worldToCanvas(body.getWorldPoint(verts[i]));
+      for (let i = 1; i < count; i++) {
+        const p = this.renderer.worldToCanvas(body.getWorldPoint(s.m_vertices[i]));
         ctx.lineTo(p.x, p.y);
       }
       ctx.closePath();
 
     } else if (type === 'edge') {
-      const s = shape as planck.EdgeShape;
+      const s  = shape as planck.EdgeShape;
       const c1 = this.renderer.worldToCanvas(body.getWorldPoint(s.m_vertex1));
       const c2 = this.renderer.worldToCanvas(body.getWorldPoint(s.m_vertex2));
       ctx.moveTo(c1.x, c1.y);
       ctx.lineTo(c2.x, c2.y);
 
     } else if (type === 'chain') {
-      const s = shape as planck.ChainShape;
+      const s     = shape as planck.ChainShape;
       const verts = s.m_vertices;
       if (verts.length === 0) return;
       const first = this.renderer.worldToCanvas(body.getWorldPoint(verts[0]));
@@ -144,13 +188,16 @@ export class SelectTool {
   private hitTest(worldPos: planck.Vec2): planck.Body | null {
     let hitBody: planck.Body | null = null;
 
+    // Use pixel-based tolerance for line shapes, converted to world units at current zoom
+    const lineTolWorld = this.renderer.pixelsToWorldLength(LINE_HIT_PIXELS);
+
     const aabb = planck.AABB(
-      planck.Vec2(worldPos.x - HIT_TEST_HALF_EXTENT, worldPos.y - HIT_TEST_HALF_EXTENT),
-      planck.Vec2(worldPos.x + HIT_TEST_HALF_EXTENT, worldPos.y + HIT_TEST_HALF_EXTENT)
+      planck.Vec2(worldPos.x - lineTolWorld, worldPos.y - lineTolWorld),
+      planck.Vec2(worldPos.x + lineTolWorld, worldPos.y + lineTolWorld),
     );
 
     this.world.queryAABB(aabb, (fixture) => {
-      if (fixture.testPoint(worldPos)) {
+      if (this.fixtureHitTest(fixture, worldPos, lineTolWorld)) {
         hitBody = fixture.getBody();
         return false; // stop at first hit
       }
@@ -160,11 +207,47 @@ export class SelectTool {
     return hitBody;
   }
 
+  /**
+   * Per-shape hit test. Circle and polygon use testPoint (filled interior).
+   * Edge and chain use point-to-segment distance since they have no interior.
+   * lineTolWorld is LINE_HIT_PIXELS converted to world units at the current zoom.
+   */
+  private fixtureHitTest(fixture: planck.Fixture, worldPos: planck.Vec2, lineTolWorld: number): boolean {
+    const shape = fixture.getShape();
+    const body  = fixture.getBody();
+    const type  = shape.getType();
+
+    if (type === 'circle' || type === 'polygon') {
+      return fixture.testPoint(worldPos);
+    }
+
+    if (type === 'edge') {
+      const s  = shape as planck.EdgeShape;
+      const v1 = body.getWorldPoint(s.m_vertex1);
+      const v2 = body.getWorldPoint(s.m_vertex2);
+      return pointToSegmentDistSq(worldPos, v1, v2) <= lineTolWorld * lineTolWorld;
+    }
+
+    if (type === 'chain') {
+      const s     = shape as planck.ChainShape;
+      const verts = s.m_vertices;
+      for (let i = 0; i < verts.length - 1; i++) {
+        const v1 = body.getWorldPoint(verts[i]);
+        const v2 = body.getWorldPoint(verts[i + 1]);
+        if (pointToSegmentDistSq(worldPos, v1, v2) <= lineTolWorld * lineTolWorld) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    return false;
+  }
+
   private beginDrag(body: planck.Body, worldPos: planck.Vec2): void {
     body.setAwake(true);
 
     if (this.isSimulationRunning() && body.getType() !== 'static') {
-      // Use MouseJoint while simulation is running
       const mass = body.getMass();
       this.mouseJoint = this.world.createJoint(new planck.MouseJoint(
         {
@@ -174,10 +257,9 @@ export class SelectTool {
         },
         this.dragAnchorBody,
         body,
-        worldPos
+        worldPos,
       )) as planck.MouseJoint;
     } else {
-      // Directly reposition while paused — record offset from body origin to grab point
       const pos = body.getPosition();
       this.dragOffset = planck.Vec2(worldPos.x - pos.x, worldPos.y - pos.y);
     }

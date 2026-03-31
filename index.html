@@ -107,6 +107,135 @@
         overflow: hidden;
       }
 
+      /* ── Right: properties panel (floats over the canvas) ── */
+      #properties-panel {
+        display: none;
+        flex-direction: column;
+        gap: 0;
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 240px;
+        height: 100%;
+        background: rgba(22, 22, 22, 0.93);
+        border-left: 1px solid #444;
+        overflow-y: auto;
+        padding: 8px 10px;
+        z-index: 10;
+      }
+
+      .prop-heading {
+        font-size: 11px;
+        font-weight: bold;
+        color: #aaa;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 2px 0 6px;
+      }
+
+      .prop-separator {
+        height: 1px;
+        background: #333;
+        margin: 6px 0;
+      }
+
+      .prop-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        padding: 3px 0;
+      }
+
+      .prop-row-label {
+        font-size: 11px;
+        color: #999;
+        flex-shrink: 0;
+      }
+
+      .prop-color {
+        width: 40px;
+        height: 22px;
+        padding: 1px;
+        border: 1px solid #555;
+        border-radius: 3px;
+        background: #2a2a2a;
+        cursor: pointer;
+      }
+
+      .prop-select {
+        flex: 1;
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        border-radius: 3px;
+        padding: 2px 4px;
+        font-size: 11px;
+      }
+
+      .prop-slider {
+        flex: 1;
+        min-width: 0;
+        accent-color: #88f;
+      }
+
+      .prop-number {
+        width: 60px;
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        border-radius: 3px;
+        padding: 2px 4px;
+        font-size: 11px;
+        text-align: right;
+      }
+
+      .prop-number-small {
+        width: 44px;
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        border-radius: 3px;
+        padding: 2px 4px;
+        font-size: 11px;
+        text-align: right;
+      }
+
+      .prop-checkbox {
+        accent-color: #88f;
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+      }
+
+      .prop-layer-section {
+        padding: 3px 0;
+      }
+
+      .prop-layer-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        margin-top: 4px;
+      }
+
+      .prop-collapsible-header {
+        background: none;
+        border: none;
+        color: #888;
+        font-size: 11px;
+        cursor: pointer;
+        text-align: left;
+        padding: 4px 0;
+        width: 100%;
+      }
+
+      .prop-collapsible-header:hover { color: #ccc; }
+
+      .prop-collapsible-body {
+        padding-left: 4px;
+      }
+
       #simulation-canvas {
         display: block;
         width: 100%;
@@ -132,6 +261,7 @@
       <div id="sidebar"></div>
       <div id="canvas-container">
         <canvas id="simulation-canvas"></canvas>
+        <div id="properties-panel"></div>
       </div>
     </div>
     <div id="status-bar"></div>
