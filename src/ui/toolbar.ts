@@ -6,8 +6,8 @@ export type ToolType =
   | 'circle'
   | 'box'
   | 'polygon'
-  | 'edge'
-  | 'chain'
+  | 'line'
+  | 'segments'
   | 'revolute-joint'
   | 'weld-joint'
   | 'prismatic-joint'
@@ -25,8 +25,8 @@ const SIDEBAR_TOOL_LABELS: Record<Exclude<ToolType, 'select'>, string> = {
   'circle':          'Circle',
   'box':             'Box',
   'polygon':         'Polygon',
-  'edge':            'Edge',
-  'chain':           'Chain',
+  'line':            'Line',
+  'segments':        'Segments',
   'revolute-joint':  '⊕ Revolute',
   'weld-joint':      '✕ Weld',
   'prismatic-joint': '⇔ Prismatic',
@@ -43,8 +43,8 @@ const SIDEBAR_TOOL_HINTS: Record<Exclude<ToolType, 'select'>, string> = {
   'circle':          'Circle — click to set center, drag to set radius',
   'box':             'Box — click one corner, drag to the opposite corner',
   'polygon':         'Polygon — click to place vertices; click near first vertex or Enter to close; Backspace to undo',
-  'edge':            'Edge — a static line segment; click start point, drag to end point',
-  'chain':           'Chain — a static series of segments; click vertices, double-click or Enter to finish',
+  'line':            'Line — a static line segment; click start point, drag to end point',
+  'segments':        'Segments — a static series of connected line segments; click vertices, double-click or Enter to finish',
   'revolute-joint':  'Revolute joint — two bodies rotate freely around a shared anchor point (hinge/pin)',
   'weld-joint':      'Weld joint — rigidly fuses two bodies together at an anchor point; they cannot move relative to each other',
   'prismatic-joint': 'Prismatic joint — one body slides along an axis relative to another, like a piston or drawer',
@@ -73,7 +73,7 @@ export class Toolbar {
   private buildSidebar(container: HTMLElement, statusBar: StatusBar): void {
     container.innerHTML = '';
 
-    const shapeTools: Exclude<ToolType, 'select'>[] = ['circle', 'box', 'polygon', 'edge', 'chain'];
+    const shapeTools: Exclude<ToolType, 'select'>[] = ['circle', 'box', 'polygon', 'line', 'segments'];
     const jointTools: Exclude<ToolType, 'select'>[] = [
       'revolute-joint', 'weld-joint', 'prismatic-joint', 'distance-joint',
       'rope-joint', 'pulley-joint', 'gear-joint', 'wheel-joint',

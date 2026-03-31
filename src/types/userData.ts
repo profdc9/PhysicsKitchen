@@ -11,7 +11,7 @@ export interface BodyUserData {
    * 4-vertex PolygonShape as a box (two corner handles) or a free polygon (per-vertex handles).
    * Absent on bodies created outside InputHandler (e.g. the initial ground plane).
    */
-  shapeKind?: 'circle' | 'box' | 'polygon' | 'edge' | 'chain';
+  shapeKind?: 'circle' | 'box' | 'polygon' | 'line' | 'segments';
 
   collisionSound?: {
     enabled: boolean;

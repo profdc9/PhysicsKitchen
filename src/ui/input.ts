@@ -10,7 +10,7 @@ const DEFAULT_DENSITY = 1.0;
 const DEFAULT_FRICTION = 0.3;
 const DEFAULT_RESTITUTION = 0.3;
 
-// Minimum drag distance in pixels before a circle/box/edge is committed
+// Minimum drag distance in pixels before a circle/box/line is committed
 const MIN_DRAG_PIXELS = 4;
 
 // How close the cursor must be to the first polygon vertex (in pixels) to close it
@@ -32,9 +32,9 @@ type PlacementState =
   | { phase: 'idle' }
   | { phase: 'circle-dragging';  startWorld: planck.Vec2; startCanvas: CanvasPoint }
   | { phase: 'box-dragging';     startWorld: planck.Vec2; startCanvas: CanvasPoint }
-  | { phase: 'edge-dragging';    startWorld: planck.Vec2; startCanvas: CanvasPoint }
+  | { phase: 'line-dragging';    startWorld: planck.Vec2; startCanvas: CanvasPoint }
   | { phase: 'polygon-placing';  vertices: planck.Vec2[]; mouseCanvas: CanvasPoint }
-  | { phase: 'chain-placing';    vertices: planck.Vec2[]; mouseCanvas: CanvasPoint; lastClickMs: number };
+  | { phase: 'segments-placing';    vertices: planck.Vec2[]; mouseCanvas: CanvasPoint; lastClickMs: number };
 
 export class InputHandler {
   private canvas: HTMLCanvasElement;
@@ -97,9 +97,9 @@ export class InputHandler {
       case 'select':  this.statusBar.set('Click a body or joint to select it'); break;
       case 'circle':  this.statusBar.set('Click to set center, drag to set radius'); break;
       case 'box':     this.statusBar.set('Click one corner, drag to opposite corner'); break;
-      case 'edge':    this.statusBar.set('Click start point, drag to end point'); break;
-      case 'polygon': this.statusBar.set('Click to place vertices. Click near first vertex or Enter to close. Backspace to undo last vertex'); break;
-      case 'chain':   this.statusBar.set('Click to place vertices. Double-click or Enter to finish. Backspace to undo last vertex'); break;
+      case 'line':     this.statusBar.set('Click start point, drag to end point'); break;
+      case 'polygon':  this.statusBar.set('Click to place vertices. Click near first vertex or Enter to close. Backspace to undo last vertex'); break;
+      case 'segments': this.statusBar.set('Click to place vertices. Double-click or Enter to finish. Backspace to undo last vertex'); break;
       default:        this.statusBar.set('');
     }
   }
@@ -125,16 +125,16 @@ export class InputHandler {
         this.state = { phase: 'box-dragging', startWorld: wp, startCanvas: cp };
         break;
 
-      case 'edge':
-        this.state = { phase: 'edge-dragging', startWorld: wp, startCanvas: cp };
+      case 'line':
+        this.state = { phase: 'line-dragging', startWorld: wp, startCanvas: cp };
         break;
 
       case 'polygon':
         this.handlePolygonClick(wp, cp);
         break;
 
-      case 'chain':
-        this.handleChainClick(wp, cp);
+      case 'segments':
+        this.handleSegmentsClick(wp, cp);
         break;
     }
   }
@@ -157,16 +157,16 @@ export class InputHandler {
       case 'box-dragging':
         this.updateBoxPreview(cp);
         break;
-      case 'edge-dragging':
-        this.updateEdgePreview(cp);
+      case 'line-dragging':
+        this.updateLinePreview(cp);
         break;
       case 'polygon-placing':
         this.state.mouseCanvas = cp;
         this.updatePolygonPreview();
         break;
-      case 'chain-placing':
+      case 'segments-placing':
         this.state.mouseCanvas = cp;
-        this.updateChainPreview();
+        this.updateSegmentsPreview();
         break;
     }
   }
@@ -199,10 +199,10 @@ export class InputHandler {
       this.state = { phase: 'idle' };
       this.previewFn = null;
 
-    } else if (this.state.phase === 'edge-dragging') {
+    } else if (this.state.phase === 'line-dragging') {
       const dragPx = Math.hypot(cp.x - this.state.startCanvas.x, cp.y - this.state.startCanvas.y);
       if (dragPx >= MIN_DRAG_PIXELS) {
-        this.placeEdge(this.state.startWorld, wp);
+        this.placeLine(this.state.startWorld, wp);
       }
       this.state = { phase: 'idle' };
       this.previewFn = null;
@@ -223,14 +223,14 @@ export class InputHandler {
         }
       }
 
-    } else if (this.state.phase === 'chain-placing') {
+    } else if (this.state.phase === 'segments-placing') {
       if (e.key === 'Enter') {
-        this.commitChain();
+        this.commitSegments();
       } else if (e.key === 'Backspace') {
         e.preventDefault();
         if (this.state.vertices.length > 0) {
           this.state.vertices.pop();
-          this.updateChainPreview();
+          this.updateSegmentsPreview();
         }
       }
     }
@@ -327,44 +327,44 @@ export class InputHandler {
     };
   }
 
-  // ── Chain logic ───────────────────────────────────────────────────────────
+  // ── Segments logic ────────────────────────────────────────────────────────
 
-  private handleChainClick(wp: planck.Vec2, cp: CanvasPoint): void {
+  private handleSegmentsClick(wp: planck.Vec2, cp: CanvasPoint): void {
     const now = Date.now();
 
-    if (this.state.phase !== 'chain-placing') {
-      this.state = { phase: 'chain-placing', vertices: [wp], mouseCanvas: cp, lastClickMs: now };
-      this.updateChainPreview();
+    if (this.state.phase !== 'segments-placing') {
+      this.state = { phase: 'segments-placing', vertices: [wp], mouseCanvas: cp, lastClickMs: now };
+      this.updateSegmentsPreview();
       return;
     }
 
     // Double-click to finish
     if (now - this.state.lastClickMs <= DOUBLE_CLICK_MS) {
-      this.commitChain();
+      this.commitSegments();
       return;
     }
 
     this.state.vertices.push(wp);
     this.state.lastClickMs = now;
-    this.updateChainPreview();
+    this.updateSegmentsPreview();
   }
 
-  private commitChain(): void {
-    if (this.state.phase !== 'chain-placing') return;
+  private commitSegments(): void {
+    if (this.state.phase !== 'segments-placing') return;
     if (this.state.vertices.length >= 2) {
-      this.placeChain(this.state.vertices);
+      this.placeSegments(this.state.vertices);
     }
     this.state = { phase: 'idle' };
     this.previewFn = null;
   }
 
-  private updateChainPreview(): void {
-    if (this.state.phase !== 'chain-placing') return;
+  private updateSegmentsPreview(): void {
+    if (this.state.phase !== 'segments-placing') return;
     const vertices = this.state.vertices;
     const mouseCanvas = this.state.mouseCanvas;
 
     this.previewFn = () => {
-      if (this.state.phase !== 'chain-placing') return;
+      if (this.state.phase !== 'segments-placing') return;
       const ctx = this.renderer.getContext();
       ctx.save();
       ctx.strokeStyle = PREVIEW_STROKE;
@@ -444,8 +444,8 @@ export class InputHandler {
     };
   }
 
-  private updateEdgePreview(cp: CanvasPoint): void {
-    if (this.state.phase !== 'edge-dragging') return;
+  private updateLinePreview(cp: CanvasPoint): void {
+    if (this.state.phase !== 'line-dragging') return;
     const c1 = this.renderer.worldToCanvas(this.state.startWorld);
 
     this.previewFn = () => {
@@ -490,13 +490,13 @@ export class InputHandler {
     body.setUserData({ shapeKind: 'box' } satisfies BodyUserData);
   }
 
-  private placeEdge(v1: planck.Vec2, v2: planck.Vec2): void {
+  private placeLine(v1: planck.Vec2, v2: planck.Vec2): void {
     const body = this.world.createBody({ type: 'static' });
     body.createFixture({
       shape: new planck.EdgeShape(v1, v2),
       friction: DEFAULT_FRICTION,
     });
-    body.setUserData({ shapeKind: 'edge' } satisfies BodyUserData);
+    body.setUserData({ shapeKind: 'line' } satisfies BodyUserData);
   }
 
   private placePolygon(vertices: planck.Vec2[]): void {
@@ -516,12 +516,12 @@ export class InputHandler {
     body.setUserData({ shapeKind: 'polygon' } satisfies BodyUserData);
   }
 
-  private placeChain(vertices: planck.Vec2[]): void {
+  private placeSegments(vertices: planck.Vec2[]): void {
     const body = this.world.createBody({ type: 'static' });
     body.createFixture({
       shape: new planck.ChainShape(vertices, false),
       friction: DEFAULT_FRICTION,
     });
-    body.setUserData({ shapeKind: 'chain' } satisfies BodyUserData);
+    body.setUserData({ shapeKind: 'segments' } satisfies BodyUserData);
   }
 }
