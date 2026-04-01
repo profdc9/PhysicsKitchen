@@ -142,4 +142,16 @@ export class Renderer {
   getCanvas(): HTMLCanvasElement {
     return this.canvas;
   }
+
+  /** Return the visible world-space bounding box for the current camera and canvas size. */
+  getVisibleWorldBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
+    const topLeft     = this.canvasToWorld(0, this.canvas.height);
+    const bottomRight = this.canvasToWorld(this.canvas.width, 0);
+    return {
+      minX: topLeft.x,
+      maxX: bottomRight.x,
+      minY: topLeft.y,
+      maxY: bottomRight.y,
+    };
+  }
 }

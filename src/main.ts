@@ -7,6 +7,7 @@ import { StatusBar } from './ui/statusbar';
 import { SimulationControls } from './ui/controls';
 import { InputHandler } from './ui/input';
 import { PropertiesPanel } from './ui/propertiesPanel';
+import { WorldSettingsPanel } from './ui/worldSettingsPanel';
 
 // --- Canvas: fill the container ---
 const canvas = document.getElementById('simulation-canvas') as HTMLCanvasElement;
@@ -56,7 +57,8 @@ const renderer = new Renderer(canvas, DEFAULT_RENDER_SETTINGS);
 const topBarEl    = document.getElementById('top-bar') as HTMLElement;
 const sidebarEl   = document.getElementById('sidebar') as HTMLElement;
 const statusBarEl = document.getElementById('status-bar') as HTMLElement;
-const propsPanelEl = document.getElementById('properties-panel') as HTMLElement;
+const propsPanelEl        = document.getElementById('properties-panel') as HTMLElement;
+const worldSettingsPanelEl = document.getElementById('world-settings-panel') as HTMLElement;
 
 // StatusBar must be created first so controls and toolbar can attach hints to it
 const statusBar = new StatusBar(statusBarEl);
@@ -83,11 +85,34 @@ deleteBtn.disabled = true;
 deleteBtn.addEventListener('click', () => inputHandler.getSelectTool().deleteSelected());
 topBarEl.appendChild(deleteBtn);
 
+// World Settings toggle button (always available)
+const worldBtn = document.createElement('button');
+worldBtn.className = 'top-btn';
+worldBtn.textContent = '⚙ World';
+topBarEl.appendChild(worldBtn);
+
 // Sidebar toolbar (shapes + joints)
 const toolbar = new Toolbar(sidebarEl, selectBtn, statusBar);
 
-// Properties panel (right side — shown when a body is selected)
+// Properties panel (right side — shown when a body or joint is selected)
 const propertiesPanel = new PropertiesPanel(propsPanelEl);
+
+// World settings panel (left side of canvas — toggled by ⚙ World button)
+const worldSettingsPanel = new WorldSettingsPanel(
+  worldSettingsPanelEl,
+  () => physicsWorld.getSettings(),
+  (patch) => physicsWorld.applySettings(patch),
+);
+
+worldBtn.addEventListener('click', () => {
+  if (worldSettingsPanel.isVisible()) {
+    worldSettingsPanel.hide();
+    worldBtn.classList.remove('active');
+  } else {
+    worldSettingsPanel.show();
+    worldBtn.classList.add('active');
+  }
+});
 
 function makeInputHandler(): InputHandler {
   const handler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
@@ -110,6 +135,11 @@ controls.onPlay(() => {
   controls.enableRevert();
 });
 
+// --- Pause: recall bodies that escaped the field ---
+controls.onPause(() => {
+  recallEscapedBodies(physicsWorld.world, physicsWorld.getSettings(), renderer);
+});
+
 // --- Revert: restore world to pre-play snapshot ---
 controls.onRevert(() => {
   const restoredWorld = snapshot.restore();
@@ -118,6 +148,7 @@ controls.onRevert(() => {
   registerJointCascade(physicsWorld.world);
   propertiesPanel.hide();
   deleteBtn.disabled = true;
+  worldSettingsPanel.refresh();
   inputHandler = makeInputHandler();
 });
 
@@ -129,6 +160,7 @@ controls.onReset(() => {
   registerJointCascade(physicsWorld.world);
   propertiesPanel.hide();
   deleteBtn.disabled = true;
+  worldSettingsPanel.refresh();
   inputHandler = makeInputHandler();
 });
 
@@ -163,6 +195,82 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mouseup', (e) => {
   if (e.button === 1) isPanning = false;
 });
+
+// --- Field-size body recall -----------------------------------------------
+// When the simulation pauses, any non-static body whose distance from the
+// origin exceeds the field radius is teleported to a random non-overlapping
+// position within the current view.
+
+const RECALL_MAX_TRIES = 50;
+
+function recallEscapedBodies(
+  world: planck.World,
+  settings: ReturnType<typeof physicsWorld.getSettings>,
+  rend: typeof renderer,
+): void {
+  if (!settings.fieldSizeEnabled || settings.fieldSize <= 0) return;
+
+  const bounds      = rend.getVisibleWorldBounds();
+  const fieldSizeSq = settings.fieldSize * settings.fieldSize;
+
+  for (let body = world.getBodyList(); body; body = body.getNext()) {
+    if (body.getType() === 'static') continue;
+    const pos = body.getPosition();
+    if (pos.x * pos.x + pos.y * pos.y <= fieldSizeSq) continue;
+    relocateBody(body, world, bounds);
+  }
+}
+
+function relocateBody(
+  body: planck.Body,
+  world: planck.World,
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+): void {
+  // Approximate body half-extents from current world AABB.
+  let halfW = 0.5, halfH = 0.5;
+  for (let f = body.getFixtureList(); f; f = f.getNext()) {
+    const aabb = f.getAABB(0);
+    halfW = Math.max(halfW, (aabb.upperBound.x - aabb.lowerBound.x) / 2);
+    halfH = Math.max(halfH, (aabb.upperBound.y - aabb.lowerBound.y) / 2);
+  }
+
+  const margin = Math.max(halfW, halfH) + 0.1;
+  const rangeX = bounds.maxX - bounds.minX - margin * 2;
+  const rangeY = bounds.maxY - bounds.minY - margin * 2;
+
+  const tryPlace = (x: number, y: number): boolean => {
+    const queryAABB = planck.AABB(
+      planck.Vec2(x - halfW, y - halfH),
+      planck.Vec2(x + halfW, y + halfH),
+    );
+    let occupied = false;
+    world.queryAABB(queryAABB, (fixture) => {
+      if (fixture.getBody() !== body) { occupied = true; return false; }
+      return true;
+    });
+    if (!occupied) {
+      body.setPosition(planck.Vec2(x, y));
+      body.setLinearVelocity(planck.Vec2(0, 0));
+      body.setAngularVelocity(0);
+    }
+    return !occupied;
+  };
+
+  if (rangeX > 0 && rangeY > 0) {
+    for (let i = 0; i < RECALL_MAX_TRIES; i++) {
+      const x = bounds.minX + margin + Math.random() * rangeX;
+      const y = bounds.minY + margin + Math.random() * rangeY;
+      if (tryPlace(x, y)) return;
+    }
+  }
+
+  // Fallback: center of view, even if overlapping.
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cy = (bounds.minY + bounds.maxY) / 2;
+  body.setPosition(planck.Vec2(cx, cy));
+  body.setLinearVelocity(planck.Vec2(0, 0));
+  body.setAngularVelocity(0);
+}
 
 // --- Simulation + render loop ---
 function loop(): void {
