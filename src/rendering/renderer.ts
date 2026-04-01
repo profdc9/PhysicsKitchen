@@ -106,7 +106,7 @@ export class Renderer {
   }
 
   /** Clear the canvas and draw all world objects. */
-  draw(world: planck.World): void {
+  draw(world: planck.World, selectedJoint: planck.Joint | null = null): void {
     this.clear();
 
     this.ctx.save();
@@ -116,7 +116,7 @@ export class Renderer {
     }
 
     if (this.settings.showJoints) {
-      drawJoints(this.ctx, world, this);
+      drawJoints(this.ctx, world, this, selectedJoint);
     }
 
     this.ctx.restore();

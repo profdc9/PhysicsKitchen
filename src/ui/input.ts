@@ -3,6 +3,7 @@ import { Renderer } from '../rendering/renderer';
 import { Toolbar, ToolType } from './toolbar';
 import { StatusBar } from './statusbar';
 import { SelectTool } from './selectTool';
+import { JointTool, JointToolType } from './jointTool';
 import { BodyUserData } from '../types/userData';
 
 // Default physical properties for newly placed bodies
@@ -36,6 +37,13 @@ type PlacementState =
   | { phase: 'polygon-placing';  vertices: planck.Vec2[]; mouseCanvas: CanvasPoint }
   | { phase: 'segments-placing';    vertices: planck.Vec2[]; mouseCanvas: CanvasPoint; lastClickMs: number };
 
+// Joint tool type names for routing
+const JOINT_TOOLS = new Set<ToolType>([
+  'revolute-joint', 'weld-joint', 'prismatic-joint', 'distance-joint',
+  'rope-joint', 'pulley-joint', 'gear-joint', 'wheel-joint',
+  'friction-joint', 'motor-joint',
+]);
+
 export class InputHandler {
   private canvas: HTMLCanvasElement;
   private world: planck.World;
@@ -45,6 +53,7 @@ export class InputHandler {
   private state: PlacementState = { phase: 'idle' };
   private previewFn: (() => void) | null = null;
   private selectTool: SelectTool;
+  private jointTool: JointTool;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -60,13 +69,15 @@ export class InputHandler {
     this.toolbar = toolbar;
     this.statusBar = statusBar;
     this.selectTool = new SelectTool(world, renderer, isSimulationRunning);
+    this.jointTool  = new JointTool(world, renderer);
+    this.jointTool.onStatusChange((text) => this.statusBar.set(text));
 
     this.toolbar.onChange((tool) => this.onToolChanged(tool));
     this.onToolChanged(this.toolbar.getCurrentTool());
 
     canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
-    canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    canvas.addEventListener('mouseup',   (e) => this.onMouseUp(e));
+    window.addEventListener('mousemove', (e) => this.onMouseMove(e));
+    window.addEventListener('mouseup',   (e) => this.onMouseUp(e));
     window.addEventListener('keydown',   (e) => this.onKeyDown(e));
   }
 
@@ -74,9 +85,14 @@ export class InputHandler {
     return this.selectTool;
   }
 
+  getJointTool(): JointTool {
+    return this.jointTool;
+  }
+
   /** Called each frame by the render loop to draw selection highlights and placement previews. */
   drawPreview(): void {
     this.selectTool.drawSelection();
+    this.jointTool.drawPreview();
     if (this.previewFn) this.previewFn();
   }
 
@@ -89,18 +105,24 @@ export class InputHandler {
     this.selectTool.deactivate();
     this.state = { phase: 'idle' };
     this.previewFn = null;
-    this.updateStatusBar(tool);
+
+    if (JOINT_TOOLS.has(tool)) {
+      this.jointTool.activate(tool as JointToolType);
+    } else {
+      this.jointTool.deactivate();
+      this.updateStatusBar(tool);
+    }
   }
 
   private updateStatusBar(tool: ToolType): void {
     switch (tool) {
-      case 'select':  this.statusBar.set('Click a body or joint to select it'); break;
-      case 'circle':  this.statusBar.set('Click to set center, drag to set radius'); break;
-      case 'box':     this.statusBar.set('Click one corner, drag to opposite corner'); break;
+      case 'select':   this.statusBar.set('Click a body or joint to select it'); break;
+      case 'circle':   this.statusBar.set('Click to set center, drag to set radius'); break;
+      case 'box':      this.statusBar.set('Click one corner, drag to opposite corner'); break;
       case 'line':     this.statusBar.set('Click start point, drag to end point'); break;
       case 'polygon':  this.statusBar.set('Click to place vertices. Click near first vertex or Enter to close. Backspace to undo last vertex'); break;
       case 'segments': this.statusBar.set('Click to place vertices. Double-click or Enter to finish. Backspace to undo last vertex'); break;
-      default:        this.statusBar.set('');
+      default:         this.statusBar.set('');
     }
   }
 
@@ -108,9 +130,15 @@ export class InputHandler {
 
   private onMouseDown(e: MouseEvent): void {
     if (e.button !== 0) return;
-    const cp = this.canvasPos(e);
-    const wp = this.renderer.canvasToWorld(cp.x, cp.y);
+    const cp   = this.canvasPos(e);
+    const wp   = this.renderer.canvasToWorld(cp.x, cp.y);
     const tool = this.toolbar.getCurrentTool();
+
+    if (JOINT_TOOLS.has(tool)) {
+      // Only consume the event if the joint tool actually used it (axis drag start).
+      // For all other joint phases, onMouseDown is a no-op and returns false.
+      if (this.jointTool.onMouseDown(wp, cp, e.ctrlKey)) return;
+    }
 
     switch (tool) {
       case 'select':
@@ -142,10 +170,16 @@ export class InputHandler {
   // ── Mouse move ────────────────────────────────────────────────────────────
 
   private onMouseMove(e: MouseEvent): void {
-    const cp = this.canvasPos(e);
-    const wp = this.renderer.canvasToWorld(cp.x, cp.y);
+    const cp   = this.canvasPos(e);
+    const wp   = this.renderer.canvasToWorld(cp.x, cp.y);
+    const tool = this.toolbar.getCurrentTool();
 
-    if (this.toolbar.getCurrentTool() === 'select') {
+    if (JOINT_TOOLS.has(tool)) {
+      this.jointTool.onMouseMove(wp, cp, e.ctrlKey, e.shiftKey);
+      return;
+    }
+
+    if (tool === 'select') {
       this.selectTool.onMouseMove(wp, cp, e.shiftKey);
       return;
     }
@@ -175,10 +209,16 @@ export class InputHandler {
 
   private onMouseUp(e: MouseEvent): void {
     if (e.button !== 0) return;
-    const cp = this.canvasPos(e);
-    const wp = this.renderer.canvasToWorld(cp.x, cp.y);
+    const cp   = this.canvasPos(e);
+    const wp   = this.renderer.canvasToWorld(cp.x, cp.y);
+    const tool = this.toolbar.getCurrentTool();
 
-    if (this.toolbar.getCurrentTool() === 'select') {
+    if (JOINT_TOOLS.has(tool)) {
+      this.jointTool.onMouseUp(wp, cp, e.ctrlKey, e.shiftKey);
+      return;
+    }
+
+    if (tool === 'select') {
       this.selectTool.onMouseUp();
       return;
     }
@@ -212,6 +252,13 @@ export class InputHandler {
   // ── Keyboard ──────────────────────────────────────────────────────────────
 
   private onKeyDown(e: KeyboardEvent): void {
+    const tool = this.toolbar.getCurrentTool();
+
+    if (JOINT_TOOLS.has(tool)) {
+      this.jointTool.onKeyDown(e);
+      return;
+    }
+
     if (this.state.phase === 'polygon-placing') {
       if (e.key === 'Enter') {
         this.commitPolygon();

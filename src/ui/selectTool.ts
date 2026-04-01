@@ -1,6 +1,10 @@
 import * as planck from 'planck';
 import { Renderer } from '../rendering/renderer';
 import { BodyHandles, CanvasPt } from './bodyHandles';
+import { getJointAnchorPoints, ANCHOR_HIT_PX } from '../rendering/joints';
+
+// Larger hit radius for joint selection than for the rendered dot — easier to click.
+const JOINT_SELECT_HIT_PX = 14;
 
 /** Squared distance from point p to the nearest point on segment (a, b). */
 function pointToSegmentDistSq(p: planck.Vec2, a: planck.Vec2, b: planck.Vec2): number {
@@ -36,6 +40,9 @@ export class SelectTool {
   private selectedBody: planck.Body | null = null;
   private onSelectCallback: ((body: planck.Body | null) => void) | null = null;
 
+  private selectedJoint: planck.Joint | null = null;
+  private onJointSelectCallback: ((joint: planck.Joint | null) => void) | null = null;
+
   private handles: BodyHandles;
 
   // MouseJoint used while dragging during simulation
@@ -60,24 +67,40 @@ export class SelectTool {
     return this.selectedBody;
   }
 
+  getSelectedJoint(): planck.Joint | null {
+    return this.selectedJoint;
+  }
+
   onSelect(callback: (body: planck.Body | null) => void): void {
     this.onSelectCallback = callback;
   }
 
+  onJointSelect(callback: (joint: planck.Joint | null) => void): void {
+    this.onJointSelectCallback = callback;
+  }
+
   /**
-   * Destroy the currently selected body and clear the selection.
-   * Returns true if a body was deleted, false if nothing was selected.
-   * The world's remove-body hook handles any application-level cleanup.
+   * Destroy the currently selected body or joint and clear the selection.
+   * Returns true if something was deleted, false if nothing was selected.
+   * The world's remove-body/remove-joint hooks handle any application-level cleanup.
    */
   deleteSelected(): boolean {
-    if (!this.selectedBody) return false;
-    this.endDrag();
-    this.world.destroyBody(this.selectedBody);
-    // selectedBody is now a dangling reference — clear it before any callbacks fire
-    this.selectedBody = null;
-    this.handles.setBody(null);
-    this.onSelectCallback?.(null);
-    return true;
+    if (this.selectedJoint) {
+      this.world.destroyJoint(this.selectedJoint);
+      this.selectedJoint = null;
+      this.onJointSelectCallback?.(null);
+      return true;
+    }
+    if (this.selectedBody) {
+      this.endDrag();
+      this.world.destroyBody(this.selectedBody);
+      // selectedBody is now a dangling reference — clear it before any callbacks fire
+      this.selectedBody = null;
+      this.handles.setBody(null);
+      this.onSelectCallback?.(null);
+      return true;
+    }
+    return false;
   }
 
   /** Call when the select tool is deactivated to clean up state. */
@@ -85,19 +108,37 @@ export class SelectTool {
     this.endDrag();
     this.handles.setBody(null);
     this.selectedBody = null;
+    this.selectedJoint = null;
     this.onSelectCallback?.(null);
+    this.onJointSelectCallback?.(null);
   }
 
   onMouseDown(worldPos: planck.Vec2, canvasPt: CanvasPt): void {
-    // Handle drags take priority over body drags, but only when paused
+    // Joint anchors take the highest priority — they are drawn on top of bodies
+    // and must be selectable even when a body handle is nearby.
+    const jointHit = this.hitTestJoint(canvasPt);
+    if (jointHit) {
+      this.selectedJoint = jointHit;
+      this.selectedBody  = null;
+      this.handles.setBody(null);
+      this.onSelectCallback?.(null);
+      this.onJointSelectCallback?.(jointHit);
+      return;
+    }
+
+    // Body resize/rotate handles take priority over body selection, but not joints.
     if (this.handles.onMouseDown(canvasPt)) return;
 
-    const hit = this.hitTest(worldPos);
-    if (hit) {
-      this.selectedBody = hit;
-      this.beginDrag(hit, worldPos);
+    const bodyHit = this.hitTest(worldPos);
+    if (bodyHit) {
+      this.selectedBody  = bodyHit;
+      this.selectedJoint = null;
+      this.beginDrag(bodyHit, worldPos);
+      this.onJointSelectCallback?.(null);
     } else {
-      this.selectedBody = null;
+      this.selectedBody  = null;
+      this.selectedJoint = null;
+      this.onJointSelectCallback?.(null);
     }
     this.handles.setBody(this.selectedBody);
     this.onSelectCallback?.(this.selectedBody);
@@ -129,11 +170,26 @@ export class SelectTool {
     this.endDrag();
   }
 
-  /** Draw a highlight outline around the selected body, then draw editing handles. */
+  /** Draw a highlight outline around the selected body or joint, then draw editing handles. */
   drawSelection(): void {
-    if (!this.selectedBody) return;
-
     const ctx = this.renderer.getContext();
+
+    if (this.selectedJoint) {
+      // Highlight the two connected bodies in a muted green to indicate the joint's connections
+      ctx.save();
+      ctx.strokeStyle = 'rgba(80, 220, 140, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      for (const body of [this.selectedJoint.getBodyA(), this.selectedJoint.getBodyB()]) {
+        for (let f = body.getFixtureList(); f; f = f.getNext()) {
+          this.drawFixtureHighlight(ctx, body, f);
+        }
+      }
+      ctx.restore();
+      return;
+    }
+
+    if (!this.selectedBody) return;
 
     ctx.save();
     ctx.strokeStyle = 'rgba(100, 180, 255, 0.9)';
@@ -199,6 +255,19 @@ export class SelectTool {
     }
 
     ctx.stroke();
+  }
+
+  private hitTestJoint(canvasPt: CanvasPt): planck.Joint | null {
+    for (let j = this.world.getJointList(); j; j = j.getNext()) {
+      if (j.getType() === 'mouse-joint') continue;
+      const anchors = getJointAnchorPoints(j);
+      for (const wp of anchors) {
+        const cp = this.renderer.worldToCanvas(wp);
+        const d  = Math.hypot(cp.x - canvasPt.x, cp.y - canvasPt.y);
+        if (d <= JOINT_SELECT_HIT_PX) return j;
+      }
+    }
+    return null;
   }
 
   private hitTest(worldPos: planck.Vec2): planck.Body | null {

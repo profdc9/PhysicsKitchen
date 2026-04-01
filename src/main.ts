@@ -28,6 +28,26 @@ function buildInitialScene(): void {
 }
 buildInitialScene();
 
+/**
+ * Register the remove-joint cascade hook on a world.
+ * When a RevoluteJoint or PrismaticJoint is destroyed, any GearJoint that
+ * references it must also be destroyed (planck.js does not do this automatically).
+ */
+function registerJointCascade(world: planck.World): void {
+  world.on('remove-joint', (removedJoint) => {
+    const gears: planck.Joint[] = [];
+    for (let j = world.getJointList(); j; j = j.getNext()) {
+      if (j.getType() !== 'gear-joint') continue;
+      const gj = j as planck.GearJoint;
+      if (gj.getJoint1() === removedJoint || gj.getJoint2() === removedJoint) {
+        gears.push(j);
+      }
+    }
+    for (const g of gears) world.destroyJoint(g);
+  });
+}
+registerJointCascade(physicsWorld.world);
+
 // --- Renderer ---
 const renderer = new Renderer(canvas, DEFAULT_RENDER_SETTINGS);
 
@@ -74,6 +94,10 @@ function makeInputHandler(): InputHandler {
     if (body) { propertiesPanel.show(body); deleteBtn.disabled = false; }
     else       { propertiesPanel.hide();    deleteBtn.disabled = true;  }
   });
+  handler.getSelectTool().onJointSelect((joint) => {
+    if (joint) { propertiesPanel.hide(); deleteBtn.disabled = false; }
+    else        { deleteBtn.disabled = true; }
+  });
   return handler;
 }
 
@@ -90,6 +114,7 @@ controls.onRevert(() => {
   const restoredWorld = snapshot.restore();
   if (!restoredWorld) return;
   physicsWorld = PhysicsWorld.fromWorld(restoredWorld, DEFAULT_WORLD_SETTINGS);
+  registerJointCascade(physicsWorld.world);
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   inputHandler = makeInputHandler();
@@ -100,6 +125,7 @@ controls.onReset(() => {
   snapshot.clear();
   physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
   buildInitialScene();
+  registerJointCascade(physicsWorld.world);
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   inputHandler = makeInputHandler();
@@ -140,7 +166,7 @@ window.addEventListener('mouseup', (e) => {
 // --- Simulation + render loop ---
 function loop(): void {
   if (controls.isRunning()) physicsWorld.step();
-  renderer.draw(physicsWorld.world);
+  renderer.draw(physicsWorld.world, inputHandler.getSelectTool().getSelectedJoint());
   inputHandler.drawPreview();
   propertiesPanel.refresh();
   requestAnimationFrame(loop);
