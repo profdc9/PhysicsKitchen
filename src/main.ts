@@ -12,8 +12,9 @@ import { PropertiesPanel } from './ui/propertiesPanel';
 const canvas = document.getElementById('simulation-canvas') as HTMLCanvasElement;
 
 function resizeCanvas(): void {
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = Math.round(rect.width);
+  canvas.height = Math.round(rect.height);
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);

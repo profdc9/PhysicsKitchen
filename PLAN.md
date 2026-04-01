@@ -1,6 +1,6 @@
 # PhysicsKitchen — Work Plan
 
-## Remaining Tasks (in order)
+## Completed
 
 ### 1. Body Handles ✓
 - Handles appear and work for all shape types (circle, box, polygon, edge, chain).
@@ -9,38 +9,29 @@
 - Rotation handle placed above topmost vertex handle to avoid overlap.
 - Edge/chain selection uses pixel-based distance tolerance (LINE_HIT_PIXELS) converted to world units at query time.
 
-### 2. Properties Panel — Missing Fields
-Add to `propertiesPanel.ts`:
-- Linear Velocity X / Y
-- Angular Velocity
-- Allow Sleep (checkbox)
-- Active (checkbox)
-- Collision Sound section (enabled checkbox; frequency + note picker; volume slider; duration — only shown when enabled)
-- Collapsible "Advanced" section: filterCategoryBits, filterMaskBits (checkboxes), filterGroupIndex (integer)
+### 2. Properties Panel — Body Fields ✓
+- All body property fields implemented in `propertiesPanel.ts`.
 
-### 3. Delete Selected Body / Joint
-- Keyboard shortcut (Delete / Backspace) to destroy the selected body or joint.
-- Must trigger `world.on('remove-body')` / `world.on('remove-joint')` cleanup already in place.
+### 3. Delete Selected Body / Joint ✓
+- Delete button in top bar; keyboard shortcut (Delete / Backspace).
+- Triggers `world.on('remove-body')` / `world.on('remove-joint')` cleanup.
 
-### 4. Joint Placement & Visualization (10 types)
-Order of implementation:
-1. RevoluteJoint (3-step: anchor → body A → body B)
-2. WeldJoint (same as Revolute, renders as ✕)
-3. PrismaticJoint (4-step: anchor → axis drag → body A → body B)
-4. DistanceJoint (2-step: anchor A → anchor B; spring rendering when frequencyHz > 0)
-5. RopeJoint (same as Distance; rope rendering)
-6. WheelJoint (same as Prismatic; wheel + spring rendering)
-7. FrictionJoint (same as Revolute; ✦ rendering)
-8. MotorJoint (2-step: body A → body B; ↻ rendering)
-9. PulleyJoint (4-step; pulley rendering)
-10. GearJoint (2-step: joint A → joint B; only highlights valid joint types on hover)
+### 4. Joint Placement & Visualization ✓
+All 10 joint types implemented:
+- RevoluteJoint, WeldJoint, FrictionJoint (AWB flow: anchor → body A → body B)
+- PrismaticJoint, WheelJoint (axis flow: anchor → axis drag → body A → body B)
+- DistanceJoint, RopeJoint (two-anchor flow)
+- MotorJoint (body A → body B)
+- PulleyJoint (4-step)
+- GearJoint (select two existing revolute/prismatic joints)
 
-Each joint needs:
-- Toolbar button with its symbol
-- Placement state machine
-- Canvas rendering (see CLAUDE.md Joint Visualization section)
-- Anchor handles (draggable, yellow)
-- Properties panel section
+Each joint has toolbar button, placement state machine, canvas rendering, anchor handles, and joint selection (click to select, highlighted in green, deletable).
+
+GearJoint cascade deletion: when a revolute or prismatic joint is destroyed, any GearJoint referencing it is also destroyed automatically.
+
+**Bug fixed — gear joint selection offset after simulation:** Root cause was `resizeCanvas()` using `canvas.offsetHeight` (767px) instead of `getBoundingClientRect().height` (740px). The 27px difference (the status bar height) caused `worldToCanvas()` to use the wrong canvas center for Y, creating a coordinate mismatch that grew with distance from world origin. Fixed by using `getBoundingClientRect()` in `resizeCanvas()`. Hit-test radius left at 14 px (harmless).
+
+## Remaining Tasks (in order)
 
 ### 5. World Settings Panel
 Separate panel (not body-specific):

@@ -1,6 +1,6 @@
 import * as planck from 'planck';
 import { Renderer } from '../rendering/renderer';
-import { getJointAnchorPoints, ANCHOR_HIT_PX } from '../rendering/joints';
+import { getJointAnchorPoints } from '../rendering/joints';
 
 type CP = { x: number; y: number };
 
@@ -18,6 +18,13 @@ export type JointToolType =
 
 /** Ctrl-snap attraction radius in pixels. */
 const SNAP_PIXELS    = 20;
+
+/**
+ * Hit radius (px) when clicking an existing revolute/prismatic joint anchor
+ * to select it for gear-joint creation.  Matches the 14 px used by SelectTool
+ * for joint selection so the click targets feel consistent.
+ */
+const GEAR_JOINT_HIT_PX = 14;
 
 /** Minimum drag distance in pixels before axis is committed. */
 const MIN_AXIS_PX    = 4;
@@ -339,7 +346,7 @@ export class JointTool {
       for (const wp of pts) {
         const cp = this.renderer.worldToCanvas(wp);
         ctx.beginPath();
-        ctx.arc(cp.x, cp.y, ANCHOR_HIT_PX + 2, 0, Math.PI * 2);
+        ctx.arc(cp.x, cp.y, GEAR_JOINT_HIT_PX, 0, Math.PI * 2);
         ctx.fillStyle = C_HOVER_JOINT;
         ctx.fill();
       }
@@ -625,7 +632,7 @@ export class JointTool {
       const anchors = getJointAnchorPoints(j);
       for (const wp of anchors) {
         const cp = this.renderer.worldToCanvas(wp);
-        if (Math.hypot(cp.x - canvasPos.x, cp.y - canvasPos.y) <= ANCHOR_HIT_PX) {
+        if (Math.hypot(cp.x - canvasPos.x, cp.y - canvasPos.y) <= GEAR_JOINT_HIT_PX) {
           return j as planck.RevoluteJoint | planck.PrismaticJoint;
         }
       }
