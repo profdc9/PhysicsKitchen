@@ -61,6 +61,15 @@ export class SelectTool {
 
     // A permanent static body used as the anchor for MouseJoint dragging
     this.dragAnchorBody = world.createBody({ type: 'static' });
+
+    // When a joint is destroyed externally (e.g. because its connected body was deleted),
+    // clear any dangling selectedJoint reference and notify listeners.
+    world.on('remove-joint', (removed) => {
+      if (this.selectedJoint === removed) {
+        this.selectedJoint = null;
+        this.onJointSelectCallback?.(null);
+      }
+    });
   }
 
   getSelectedBody(): planck.Body | null {

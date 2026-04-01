@@ -1,6 +1,20 @@
 import * as planck from 'planck';
 import { BodyUserData } from '../types/userData';
 
+/** Human-readable labels for each joint type. */
+const JOINT_TYPE_LABELS: Record<string, string> = {
+  'revolute-joint':  'Revolute Joint',
+  'weld-joint':      'Weld Joint',
+  'prismatic-joint': 'Prismatic Joint',
+  'distance-joint':  'Distance Joint',
+  'rope-joint':      'Rope Joint',
+  'wheel-joint':     'Wheel Joint',
+  'friction-joint':  'Friction Joint',
+  'motor-joint':     'Motor Joint',
+  'pulley-joint':    'Pulley Joint',
+  'gear-joint':      'Gear Joint',
+};
+
 /** Common musical notes for the collision-sound frequency picker. */
 const MUSICAL_NOTES: Array<{ label: string; hz: number }> = [
   { label: 'A3',  hz:  220.00 },
@@ -36,7 +50,8 @@ const DEFAULT_EM: NonNullable<BodyUserData['em']> = {
 
 export class PropertiesPanel {
   private container: HTMLElement;
-  private currentBody: planck.Body | null = null;
+  private currentBody:  planck.Body  | null = null;
+  private currentJoint: planck.Joint | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -44,13 +59,22 @@ export class PropertiesPanel {
   }
 
   show(body: planck.Body): void {
-    this.currentBody = body;
+    this.currentBody  = body;
+    this.currentJoint = null;
     this.rebuild();
     this.container.style.display = 'flex';
   }
 
+  showJoint(joint: planck.Joint): void {
+    this.currentBody  = null;
+    this.currentJoint = joint;
+    this.rebuildJoint();
+    this.container.style.display = 'flex';
+  }
+
   hide(): void {
-    this.currentBody = null;
+    this.currentBody  = null;
+    this.currentJoint = null;
     this.container.style.display = 'none';
     this.container.innerHTML = '';
   }
@@ -144,6 +168,128 @@ export class PropertiesPanel {
           f.setFilterData({ groupIndex: f.getFilterGroupIndex(), categoryBits: f.getFilterCategoryBits(), maskBits: val });
         }
       });
+    });
+  }
+
+  // ── Joint panel ───────────────────────────────────────────────────────────
+
+  private rebuildJoint(): void {
+    const joint    = this.currentJoint!;
+    const type     = joint.getType();
+    const typeName = JOINT_TYPE_LABELS[type] ?? type;
+    this.container.innerHTML = '';
+
+    this.addHeading(`${typeName} Properties`);
+
+    switch (type) {
+      case 'distance-joint':  this.buildDistanceJointSection(joint as planck.DistanceJoint);  break;
+      case 'rope-joint':      this.buildRopeJointSection(joint as planck.RopeJoint);          break;
+      case 'wheel-joint':     this.buildWheelJointSection(joint as planck.WheelJoint);        break;
+      case 'friction-joint':  this.buildFrictionJointSection(joint as planck.FrictionJoint);  break;
+      case 'motor-joint':     this.buildMotorJointSection(joint as planck.MotorJoint);        break;
+      // pulley-joint: ratio is fixed at construction time — no editable parameters
+      case 'gear-joint':      this.buildGearJointSection(joint as planck.GearJoint);          break;
+      // revolute-joint, weld-joint, prismatic-joint have no editable parameters
+    }
+  }
+
+  private buildDistanceJointSection(joint: planck.DistanceJoint): void {
+    const j = joint as any;
+
+    this.addNumberField('Length (m)', joint.getLength(), 0.001, (val) => {
+      joint.setLength(val);
+    });
+    this.addNumberField('Frequency (Hz, 0 = rigid)', j.m_frequencyHz ?? 0, 0, (val) => {
+      j.m_frequencyHz = val;
+    });
+    this.addNumberField('Damping Ratio', j.m_dampingRatio ?? 0, 0, (val) => {
+      j.m_dampingRatio = val;
+    });
+  }
+
+  private buildRopeJointSection(joint: planck.RopeJoint): void {
+    this.addNumberField('Max Length (m)', joint.getMaxLength(), 0.001, (val) => {
+      joint.setMaxLength(val);
+    });
+  }
+
+  private buildWheelJointSection(joint: planck.WheelJoint): void {
+    const j = joint as any;
+
+    this.addNumberField('Frequency (Hz, 0 = rigid)', j.m_frequencyHz ?? 0, 0, (val) => {
+      j.m_frequencyHz = val;
+    });
+    this.addNumberField('Damping Ratio', j.m_dampingRatio ?? 0, 0, (val) => {
+      j.m_dampingRatio = val;
+    });
+
+    this.addSeparator();
+
+    // Motor sub-section: show speed/torque fields only when motor is enabled.
+    const motorFields = document.createElement('div');
+    const isEnabled = joint.isMotorEnabled();
+    motorFields.style.display = isEnabled ? 'block' : 'none';
+
+    this.addCheckbox('Enable Motor', isEnabled, (val) => {
+      joint.enableMotor(val);
+      motorFields.style.display = val ? 'block' : 'none';
+    });
+
+    const prev = this.container;
+    this.container = motorFields;
+    this.addNumberField('Motor Speed (rad/s)', joint.getMotorSpeed(), null, (val) => {
+      joint.setMotorSpeed(val);
+    });
+    this.addNumberField('Max Motor Torque (N·m)', joint.getMaxMotorTorque(), 0, (val) => {
+      joint.setMaxMotorTorque(val);
+    });
+    this.container = prev;
+    this.container.appendChild(motorFields);
+  }
+
+  private buildFrictionJointSection(joint: planck.FrictionJoint): void {
+    this.addNumberField('Max Force (N)', joint.getMaxForce(), 0, (val) => {
+      joint.setMaxForce(val);
+    });
+    this.addNumberField('Max Torque (N·m)', joint.getMaxTorque(), 0, (val) => {
+      joint.setMaxTorque(val);
+    });
+  }
+
+  private buildMotorJointSection(joint: planck.MotorJoint): void {
+    const offset  = joint.getLinearOffset();
+    let offsetX   = offset.x;
+    let offsetY   = offset.y;
+
+    this.addNumberField('Linear Offset X (m)', offsetX, null, (val) => {
+      offsetX = val;
+      joint.setLinearOffset(planck.Vec2(offsetX, offsetY));
+    });
+    this.addNumberField('Linear Offset Y (m)', offsetY, null, (val) => {
+      offsetY = val;
+      joint.setLinearOffset(planck.Vec2(offsetX, offsetY));
+    });
+    this.addNumberField('Angular Offset (rad)', joint.getAngularOffset(), null, (val) => {
+      joint.setAngularOffset(val);
+    });
+
+    this.addSeparator();
+
+    this.addNumberField('Max Force (N)', joint.getMaxForce(), 0, (val) => {
+      joint.setMaxForce(val);
+    });
+    this.addNumberField('Max Torque (N·m)', joint.getMaxTorque(), 0, (val) => {
+      joint.setMaxTorque(val);
+    });
+    this.addNumberField('Correction Factor', joint.getCorrectionFactor(), 0, (val) => {
+      joint.setCorrectionFactor(val);
+    });
+  }
+
+  private buildGearJointSection(joint: planck.GearJoint): void {
+    const j = joint as any;
+    this.addNumberField('Ratio', j.m_ratio ?? 1, null, (val) => {
+      j.m_ratio = val;
     });
   }
 

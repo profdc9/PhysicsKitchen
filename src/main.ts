@@ -96,8 +96,8 @@ function makeInputHandler(): InputHandler {
     else       { propertiesPanel.hide();    deleteBtn.disabled = true;  }
   });
   handler.getSelectTool().onJointSelect((joint) => {
-    if (joint) { propertiesPanel.hide(); deleteBtn.disabled = false; }
-    else        { deleteBtn.disabled = true; }
+    if (joint) { propertiesPanel.showJoint(joint); deleteBtn.disabled = false; }
+    else        { propertiesPanel.hide();           deleteBtn.disabled = true;  }
   });
   return handler;
 }
