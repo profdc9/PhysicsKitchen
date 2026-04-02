@@ -1,6 +1,7 @@
 import * as planck from 'planck';
-import { PhysicsWorld, DEFAULT_WORLD_SETTINGS } from './physics/world';
+import { PhysicsWorld, WorldSettings, DEFAULT_WORLD_SETTINGS } from './physics/world';
 import { WorldSnapshot } from './physics/snapshot';
+import { serializeScene, deserializeScene } from './physics/serialization';
 import { Renderer, DEFAULT_RENDER_SETTINGS } from './rendering/renderer';
 import { Toolbar } from './ui/toolbar';
 import { StatusBar } from './ui/statusbar';
@@ -8,6 +9,7 @@ import { SimulationControls } from './ui/controls';
 import { InputHandler } from './ui/input';
 import { PropertiesPanel } from './ui/propertiesPanel';
 import { WorldSettingsPanel } from './ui/worldSettingsPanel';
+import { attachHint } from './ui/hoverHint';
 
 // --- Canvas: fill the container ---
 const canvas = document.getElementById('simulation-canvas') as HTMLCanvasElement;
@@ -113,6 +115,62 @@ worldBtn.addEventListener('click', () => {
     worldBtn.classList.add('active');
   }
 });
+
+/**
+ * Replace the current simulation with a scene deserialized from a JSON string.
+ * Resets the snapshot, hides the properties panel, and rebuilds the input handler.
+ */
+function loadSceneFromJson(json: string): void {
+  let result: { world: planck.World; settings: WorldSettings };
+  try {
+    result = deserializeScene(json);
+  } catch (err) {
+    alert(`Failed to load scene:\n${(err as Error).message}`);
+    return;
+  }
+  controls.pause();
+  snapshot.clear();
+  physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
+  registerJointCascade(physicsWorld.world);
+  propertiesPanel.hide();
+  deleteBtn.disabled = true;
+  worldSettingsPanel.refresh();
+  inputHandler = makeInputHandler();
+}
+
+// Copy scene: serialize current state to JSON and write to clipboard
+const copyBtn = document.createElement('button');
+copyBtn.className = 'top-btn';
+copyBtn.textContent = '📋 Copy';
+attachHint(copyBtn, 'Copy scene — serialize the entire scene to JSON and copy to clipboard', statusBar);
+copyBtn.addEventListener('click', async () => {
+  const json = serializeScene(physicsWorld.world, physicsWorld.getSettings());
+  try {
+    await navigator.clipboard.writeText(json);
+    copyBtn.textContent = '✓ Copied';
+    setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
+  } catch {
+    alert('Could not write to clipboard. Please check browser permissions.');
+  }
+});
+topBarEl.appendChild(copyBtn);
+
+// Load scene: read JSON from clipboard and replace the current simulation
+const loadBtn = document.createElement('button');
+loadBtn.className = 'top-btn';
+loadBtn.textContent = '📂 Load';
+attachHint(loadBtn, 'Load scene — paste a scene from the clipboard and replace the current simulation', statusBar);
+loadBtn.addEventListener('click', async () => {
+  let json: string;
+  try {
+    json = await navigator.clipboard.readText();
+  } catch {
+    alert('Could not read from clipboard. Please check browser permissions.');
+    return;
+  }
+  loadSceneFromJson(json);
+});
+topBarEl.appendChild(loadBtn);
 
 function makeInputHandler(): InputHandler {
   const handler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
@@ -271,6 +329,22 @@ function relocateBody(
   body.setLinearVelocity(planck.Vec2(0, 0));
   body.setAngularVelocity(0);
 }
+
+// --- Load from ?scene= URL parameter ---
+// If the page URL contains ?scene=<url>, fetch that URL and load it as the initial scene.
+(async function loadSceneFromUrl(): Promise<void> {
+  const params = new URLSearchParams(window.location.search);
+  const sceneUrl = params.get('scene');
+  if (!sceneUrl) return;
+  try {
+    const response = await fetch(sceneUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    const json = await response.text();
+    loadSceneFromJson(json);
+  } catch (err) {
+    console.warn('Could not load scene from URL parameter:', err);
+  }
+})();
 
 // --- Simulation + render loop ---
 function loop(): void {

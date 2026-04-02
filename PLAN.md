@@ -31,21 +31,28 @@ GearJoint cascade deletion: when a revolute or prismatic joint is destroyed, any
 
 **Bug fixed — gear joint selection offset after simulation:** Root cause was `resizeCanvas()` using `canvas.offsetHeight` (767px) instead of `getBoundingClientRect().height` (740px). The 27px difference (the status bar height) caused `worldToCanvas()` to use the wrong canvas center for Y, creating a coordinate mismatch that grew with distance from world origin. Fixed by using `getBoundingClientRect()` in `resizeCanvas()`. Hit-test radius left at 14 px (harmless).
 
+### 5. Properties Panel — Joint Fields ✓
+- `PropertiesPanel.showJoint()` builds per-type panels for all 10 joint types.
+- Editable fields per `docs/joints.md`: DistanceJoint (length, frequencyHz, dampingRatio), RopeJoint (maxLength), WheelJoint (frequencyHz, dampingRatio, enable motor, motorSpeed, maxMotorTorque), FrictionJoint (maxForce, maxTorque), MotorJoint (linearOffset X/Y, angularOffset, maxForce, maxTorque, correctionFactor), GearJoint (ratio). PulleyJoint ratio is fixed at construction — no editable fields. Revolute, Weld, Prismatic have no editable parameters.
+- `SelectTool` listens to `remove-joint` event to clear dangling `selectedJoint` reference when a body deletion auto-destroys its joints.
+
+### 6. World Settings Panel ✓
+Separate panel (floats on left side of canvas), toggled by "⚙ World" button in top bar:
+- Gravity X / Y fields + "Gravity Off" checkbox (zeroes gravity without changing field values)
+- Allow Sleep, Continuous Physics, Sub-stepping checkboxes (applied live via world methods)
+- Time Step, Velocity Iterations, Position Iterations fields
+- Field Size section: enable checkbox + radius field; on pause, non-static bodies beyond radius are teleported to a random non-overlapping position within the current view (50 attempts, fallback to center)
+- Electromagnetic section: Wire Depth, Max Distance, Min Distance clamp
+- Collapsible "Expert" section: 8 `planck.Settings` tolerance fields + "Reset to Defaults" button
+
 ## Remaining Tasks (in order)
 
-### 5. World Settings Panel
-Separate panel (not body-specific):
-- Gravity X / Y + "Gravity Off" checkbox
-- Allow Sleep, Continuous Physics, Sub-stepping checkboxes
-- Time Step, Velocity Iterations, Position Iterations fields
-- Collapsible "Expert" section with internal solver tolerances
-
-### 6. Serialization
-- Use `planck.Serializer.toJson` / `fromJson` as base.
-- postSerialize hook: inject `userData` (color, shapeKind, collision sound, EM props) into JSON.
-- postDeserialize hook: restore userData on load.
-- Browser mode: load/save via clipboard (copy/paste JSON).
-- Browser mode: load from URL `?scene=https://...` GET parameter.
+### 6. Serialization ✓
+- Custom `planck.Serializer` instance with postSerialize/postDeserialize hooks injects and restores `pkUserData` (color, shapeKind, collision sound, EM props) on each body.
+- Scene file format: `{ version, settings, physics }` — world settings travel with the scene.
+- Browser mode: 📋 Copy / 📂 Load buttons in top bar use the clipboard API.
+- Browser mode: `?scene=<url>` GET parameter fetches and loads a scene on startup.
+- Scene files live in `public/scenes/` so Vite serves them as static assets.
 
 ### 7. Collision Sound System
 - Web Audio API, pure oscillator tones (no audio files).
