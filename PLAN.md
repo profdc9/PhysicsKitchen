@@ -54,56 +54,23 @@ Separate panel (floats on left side of canvas), toggled by "⚙ World" button in
 - Browser mode: `?scene=<url>` GET parameter fetches and loads a scene on startup.
 - Scene files live in `public/scenes/` so Vite serves them as static assets.
 
-### 7. Collision Sound System
+### 7. Collision Sound System ✓
 - Web Audio API, pure oscillator tones (no audio files).
 - Triggered in `world.on('begin-contact')` callback.
 - Per-body settings already in userData: `{ enabled, frequencyHz, volume, durationMs }`.
 
-### 8. Electromagnetic Forces
-Applied each simulation step via a custom force layer. All forces act on body centroids (no EM torque).
+### 8. Electromagnetic Forces ✓
+Applied each simulation step via `applyEmForces()` in `src/physics/emForces.ts`, called before `world.step()`.
 
-#### Geometry
-- Simulation is z-translationally invariant; global `depth` (meters) is the out-of-plane extent.
-- No Lorentz cross-coupling: v × B is out-of-plane for in-plane motion, contributing nothing to 2D dynamics.
+- `simTime` accumulates during play; reset to 0 on scene load/reset/undo/redo.
+- Per-body inductive runtime state (`I`, `dIdt_prev`) lives in `Map<Body, EmBodyState>`; cleared on world change.
+- Default `emDepth` = 100 m (approximates infinite-wire behaviour for typical scene sizes).
+- Force equations compute total force (force-per-unit-length × l); units verified to reduce to N.
 
-#### World EM Settings (added to World Settings panel)
-- `depth` — out-of-plane wire length (meters); appears in all force and inductance formulas as `l`
-- `emMaxDistance` — cutoff: body pairs farther apart than this skip EM calculations entirely
-- `emMinDistance` — clamp: `r` is treated as at least this value in all formulas to avoid divergence
-
-#### Per-Body EM Properties
-- `lambda` — linear charge density (C/m)
-- `currentType` — `fixed` | `sinusoidal` | `inductive`
-- `current` — current value (A); for sinusoidal: amplitude `I₀`, frequency `ω`, phase `φ`
-- `resistance` — wire resistance (Ω); used in inductive current integration
-- `wireDiameter` — wire diameter (meters); used in self-inductance formula
-
-#### Force Laws (both 1/r, along centroid-to-centroid unit vector r̂)
-```
-F_electric = λ₁λ₂ l / (2πε₀ r)    — same sign → repulsive
-F_magnetic  = μ₀ I₁I₂ l / (2π r)  — same direction → attractive
-```
-
-#### Inductance
-```
-Self:    L_i   = μ₀l/(2π) · (ln(2l/d) - 3/4)    d = wireDiameter
-Mutual:  M_ij  = μ₀l/(2π) · (ln(2l/r) - 1)       r = clamped centroid distance
-```
-
-#### Inductive Current Update (explicit ODE per timestep)
-```
-dM_ij/dt = -μ₀l/(2π) · (1/r_ij) · ṙ_ij          ṙ_ij = radial relative velocity
-
-dIⱼ/dt = 0                                        (fixed)
-        = I₀·ω·cos(ωt + φ)                        (sinusoidal)
-        = (E_j - R_j·Iⱼ) / L_j                   (inductive — previous timestep)
-
-E_i = -Σⱼ≠ᵢ [ (dM_ij/dt)·Iⱼ + M_ij·(dIⱼ/dt) ]
-
-dI_i/dt = (E_i - R_i·I_i) / L_i
-```
-Note: using the previous timestep's `dIⱼ/dt` for inductive bodies is an explicit approximation.
-An exact solution would solve an (n_inductive × n_inductive) linear system each timestep — note this in code.
+### 9. Collide Connected on Joints ✓
+- `Collide Connected` checkbox added to the top of every joint's properties panel.
+- Joints that previously had no editable fields (revolute, weld, prismatic, pulley) now show this field.
+- Writes directly to `joint.m_collideConnected`; planck.js contact filter picks it up on the next contact evaluation.
 
 ## Notes
 - Do NOT rebuild panel DOM every frame (breaks color pickers). Build once on selection; update `.value` only for live fields.

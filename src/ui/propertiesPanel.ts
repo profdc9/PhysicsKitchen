@@ -183,15 +183,24 @@ export class PropertiesPanel {
 
     this.addHeading(`${typeName} Properties`);
 
+    // collideConnected applies to every joint type
+    this.addCheckbox('Collide Connected', joint.getCollideConnected(), (val) => {
+      (joint as any).m_collideConnected = val;
+    });
+
+    const hasTypeFields = ['distance-joint', 'rope-joint', 'wheel-joint',
+                           'friction-joint', 'motor-joint', 'gear-joint'].includes(type);
+    if (hasTypeFields) this.addSeparator();
+
     switch (type) {
       case 'distance-joint':  this.buildDistanceJointSection(joint as planck.DistanceJoint);  break;
       case 'rope-joint':      this.buildRopeJointSection(joint as planck.RopeJoint);          break;
       case 'wheel-joint':     this.buildWheelJointSection(joint as planck.WheelJoint);        break;
       case 'friction-joint':  this.buildFrictionJointSection(joint as planck.FrictionJoint);  break;
       case 'motor-joint':     this.buildMotorJointSection(joint as planck.MotorJoint);        break;
-      // pulley-joint: ratio is fixed at construction time — no editable parameters
+      // pulley-joint: ratio fixed at construction — no additional fields
       case 'gear-joint':      this.buildGearJointSection(joint as planck.GearJoint);          break;
-      // revolute-joint, weld-joint, prismatic-joint have no editable parameters
+      // revolute-joint, weld-joint, prismatic-joint: no additional fields
     }
   }
 

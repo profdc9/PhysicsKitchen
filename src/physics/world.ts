@@ -39,7 +39,7 @@ export const DEFAULT_WORLD_SETTINGS: WorldSettings = {
   positionIterations: DEFAULT_POSITION_ITERATIONS,
   fieldSizeEnabled: false,
   fieldSize: 100,
-  emDepth: 1.0,
+  emDepth: 100.0,
   emMaxDistance: 50.0,
   emMinDistance: 0.01,
 };

@@ -11,6 +11,7 @@ import { PropertiesPanel } from './ui/propertiesPanel';
 import { WorldSettingsPanel } from './ui/worldSettingsPanel';
 import { attachHint } from './ui/hoverHint';
 import { playCollisionSound } from './audio/collisionSound';
+import { applyEmForces, EmBodyState } from './physics/emForces';
 import { BodyUserData } from './types/userData';
 
 // --- Canvas: fill the container ---
@@ -75,6 +76,12 @@ registerCollisionSounds(physicsWorld);
 
 // --- Undo/redo stack ---
 const undoStack = new UndoStack();
+
+// --- Electromagnetic simulation state ---
+// simTime accumulates while the simulation is running; reset to 0 on scene load/reset.
+let simTime = 0;
+// Runtime per-body EM state for inductive bodies; cleared whenever the world changes.
+let emBodyState = new Map<planck.Body, EmBodyState>();
 
 /**
  * Serialize the current scene and push it onto the undo stack.
@@ -181,6 +188,8 @@ function restoreScene(json: string): void {
   physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
   registerJointCascade(physicsWorld.world);
   registerCollisionSounds(physicsWorld);
+  simTime    = 0;
+  emBodyState = new Map();
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   worldSettingsPanel.refresh();
@@ -222,6 +231,8 @@ function loadSceneFromJson(json: string): void {
   physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
   registerJointCascade(physicsWorld.world);
   registerCollisionSounds(physicsWorld);
+  simTime    = 0;
+  emBodyState = new Map();
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   worldSettingsPanel.refresh();
@@ -296,6 +307,8 @@ controls.onReset(() => {
   buildInitialScene();
   registerJointCascade(physicsWorld.world);
   registerCollisionSounds(physicsWorld);
+  simTime    = 0;
+  emBodyState = new Map();
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   worldSettingsPanel.refresh();
@@ -448,7 +461,12 @@ function relocateBody(
 
 // --- Simulation + render loop ---
 function loop(): void {
-  if (controls.isRunning()) physicsWorld.step();
+  if (controls.isRunning()) {
+    const settings = physicsWorld.getSettings();
+    applyEmForces(physicsWorld.world, settings, simTime, settings.timeStep, emBodyState);
+    physicsWorld.step();
+    simTime += settings.timeStep;
+  }
   renderer.draw(physicsWorld.world, inputHandler.getSelectTool().getSelectedJoint());
   inputHandler.drawPreview();
   propertiesPanel.refresh();

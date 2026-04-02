@@ -16,6 +16,6 @@ Warning displayed: "Changing these may break the simulation."
 - Internal solver tolerances: linearSlop, aabbExtension, and other planck.js Settings fields
 
 ## Electromagnetic Settings
-- `depth` — out-of-plane wire length l (meters); used in all EM force and inductance formulas
+- `depth` — out-of-plane wire length l (meters); used in all EM force and inductance formulas; default 100 m (much larger than typical world size to approximate infinite-wire behaviour)
 - `emMaxDistance` — cutoff radius; body pairs farther apart than this skip EM calculations entirely (performance knob)
 - `emMinDistance` — clamp; r is treated as at least this value in all EM formulas to avoid divergence at close range (applies to force calculations and inductance formulas)
