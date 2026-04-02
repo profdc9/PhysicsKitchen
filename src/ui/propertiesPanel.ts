@@ -52,9 +52,11 @@ export class PropertiesPanel {
   private container: HTMLElement;
   private currentBody:  planck.Body  | null = null;
   private currentJoint: planck.Joint | null = null;
+  private onBeforeChange: (() => void) | null;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, onBeforeChange: (() => void) | null = null) {
     this.container = container;
+    this.onBeforeChange = onBeforeChange;
     this.hide();
   }
 
@@ -460,6 +462,8 @@ export class PropertiesPanel {
     input.type = 'color';
     input.value = this.toHexColor(value);
     input.className = 'prop-color';
+    // Snapshot before the color dialog opens so the original color can be restored.
+    input.addEventListener('mousedown', () => this.onBeforeChange?.());
     input.addEventListener('input', () => onChange(input.value));
     row.appendChild(input);
     this.container.appendChild(row);
@@ -476,7 +480,10 @@ export class PropertiesPanel {
       if (opt === value) el.selected = true;
       select.appendChild(el);
     }
-    select.addEventListener('change', () => onChange(select.value));
+    select.addEventListener('change', () => {
+      this.onBeforeChange?.();
+      onChange(select.value);
+    });
     row.appendChild(select);
     this.container.appendChild(row);
   }
@@ -499,12 +506,15 @@ export class PropertiesPanel {
     text.value = value.toFixed(2);
     text.className = 'prop-number-small';
 
+    // Snapshot before the slider drag starts; input events during drag don't re-snapshot.
+    slider.addEventListener('mousedown', () => this.onBeforeChange?.());
     slider.addEventListener('input', () => {
       const v = parseFloat(slider.value);
       text.value = v.toFixed(2);
       onChange(v);
     });
     text.addEventListener('change', () => {
+      this.onBeforeChange?.();
       const v = Math.min(max, Math.max(min, parseFloat(text.value) || 0));
       slider.value = String(v);
       text.value = v.toFixed(2);
@@ -528,6 +538,7 @@ export class PropertiesPanel {
     input.step = '0.1';
     input.className = 'prop-number';
     input.addEventListener('change', () => {
+      this.onBeforeChange?.();
       const v = parseFloat(input.value);
       if (!isNaN(v)) onChange(v);
     });
@@ -543,6 +554,7 @@ export class PropertiesPanel {
     input.step = '1';
     input.className = 'prop-number';
     input.addEventListener('change', () => {
+      this.onBeforeChange?.();
       const v = parseInt(input.value);
       if (!isNaN(v)) onChange(v);
     });
@@ -556,7 +568,10 @@ export class PropertiesPanel {
     input.type = 'checkbox';
     input.checked = value;
     input.className = 'prop-checkbox';
-    input.addEventListener('change', () => onChange(input.checked));
+    input.addEventListener('change', () => {
+      this.onBeforeChange?.();
+      onChange(input.checked);
+    });
     row.appendChild(input);
     this.container.appendChild(row);
   }
@@ -577,6 +592,7 @@ export class PropertiesPanel {
     freqInput.addEventListener('change', () => {
       const v = parseFloat(freqInput.value);
       if (!isNaN(v) && v > 0) {
+        this.onBeforeChange?.();
         noteSelect.value = '';  // deselect note if frequency was typed manually
         onChange(v);
       }
@@ -600,6 +616,7 @@ export class PropertiesPanel {
     noteSelect.addEventListener('change', () => {
       const hz = parseFloat(noteSelect.value);
       if (!isNaN(hz)) {
+        this.onBeforeChange?.();
         freqInput.value = String(hz);
         onChange(hz);
       }

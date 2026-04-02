@@ -111,6 +111,7 @@ export class BodyHandles {
   private body: planck.Body | null = null;
   private renderer: Renderer;
   private isSimulationRunning: () => boolean;
+  private onBeforeChange: (() => void) | null;
 
   // Stable list of handle kinds for the current body.
   // Built once on setBody(); indices remain valid until setBody() is called again.
@@ -118,6 +119,7 @@ export class BodyHandles {
 
   private hoveredIndex = -1;  // index into this.handles, or -1
   private activeIndex  = -1;  // index of the handle being dragged, or -1
+  private handleSnapshotSaved = false;  // whether snapshot was saved for the current handle drag
 
   // Rotation drag state (valid only while activeIndex points at a 'rotate' handle)
   private rotBodyAngleStart  = 0;
@@ -131,9 +133,10 @@ export class BodyHandles {
   private rotPivotWorld: planck.Vec2 = planck.Vec2(0, 0);
   private rotLocalPivot: planck.Vec2 = planck.Vec2(0, 0);
 
-  constructor(renderer: Renderer, isSimulationRunning: () => boolean) {
+  constructor(renderer: Renderer, isSimulationRunning: () => boolean, onBeforeChange: (() => void) | null = null) {
     this.renderer = renderer;
     this.isSimulationRunning = isSimulationRunning;
+    this.onBeforeChange = onBeforeChange;
   }
 
   setBody(body: planck.Body | null): void {
@@ -158,6 +161,9 @@ export class BodyHandles {
     const idx = this.hitTest(canvasPt);
     if (idx < 0) return false;
 
+    // Snapshot will be saved on first actual movement (not here) so that
+    // clicking a handle without dragging doesn't produce a spurious undo entry.
+    this.handleSnapshotSaved = false;
     this.activeIndex = idx;
 
     if (this.handles[idx].tag === 'rotate') {
@@ -176,6 +182,11 @@ export class BodyHandles {
     if (!this.body) return;
 
     if (this.activeIndex >= 0) {
+      // Snapshot before the first actual movement so the reshape can be undone.
+      if (!this.handleSnapshotSaved) {
+        this.onBeforeChange?.();
+        this.handleSnapshotSaved = true;
+      }
       const kind = this.handles[this.activeIndex];
       if (kind.tag === 'rotate') {
         this.applyRotation(canvasPt, shiftKey);

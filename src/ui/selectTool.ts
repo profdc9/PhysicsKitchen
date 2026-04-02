@@ -36,6 +36,7 @@ export class SelectTool {
   private world: planck.World;
   private renderer: Renderer;
   private isSimulationRunning: () => boolean;
+  private onBeforeChange: (() => void) | null;
 
   private selectedBody: planck.Body | null = null;
   private onSelectCallback: ((body: planck.Body | null) => void) | null = null;
@@ -51,13 +52,16 @@ export class SelectTool {
 
   // Offset from body origin to drag grab point, used for paused direct-position dragging
   private dragOffset: planck.Vec2 | null = null;
+  // Whether we've already saved an undo snapshot for the current drag gesture
+  private dragSnapshotSaved = false;
 
-  constructor(world: planck.World, renderer: Renderer, isSimulationRunning: () => boolean) {
+  constructor(world: planck.World, renderer: Renderer, isSimulationRunning: () => boolean, onBeforeChange: (() => void) | null = null) {
     this.world = world;
     this.renderer = renderer;
     this.isSimulationRunning = isSimulationRunning;
+    this.onBeforeChange = onBeforeChange;
 
-    this.handles = new BodyHandles(renderer, isSimulationRunning);
+    this.handles = new BodyHandles(renderer, isSimulationRunning, onBeforeChange);
 
     // A permanent static body used as the anchor for MouseJoint dragging
     this.dragAnchorBody = world.createBody({ type: 'static' });
@@ -95,12 +99,14 @@ export class SelectTool {
    */
   deleteSelected(): boolean {
     if (this.selectedJoint) {
+      this.onBeforeChange?.();
       this.world.destroyJoint(this.selectedJoint);
       this.selectedJoint = null;
       this.onJointSelectCallback?.(null);
       return true;
     }
     if (this.selectedBody) {
+      this.onBeforeChange?.();
       this.endDrag();
       this.world.destroyBody(this.selectedBody);
       // selectedBody is now a dangling reference — clear it before any callbacks fire
@@ -163,7 +169,11 @@ export class SelectTool {
         // Simulation running — update MouseJoint target
         this.mouseJoint.setTarget(worldPos);
       } else if (this.dragOffset && this.selectedBody) {
-        // Simulation paused — move body directly
+        // Simulation paused — snapshot before the first actual movement, then move body directly
+        if (!this.dragSnapshotSaved) {
+          this.onBeforeChange?.();
+          this.dragSnapshotSaved = true;
+        }
         const newPos = planck.Vec2(
           worldPos.x - this.dragOffset.x,
           worldPos.y - this.dragOffset.y,
@@ -342,6 +352,8 @@ export class SelectTool {
     body.setAwake(true);
 
     if (this.isSimulationRunning() && body.getType() !== 'static') {
+      // Live simulation drag via MouseJoint — this is a simulation interaction, not an edit.
+      // No undo snapshot: the simulation already continuously changes positions.
       const mass = body.getMass();
       this.mouseJoint = this.world.createJoint(new planck.MouseJoint(
         {
@@ -354,6 +366,8 @@ export class SelectTool {
         worldPos,
       )) as planck.MouseJoint;
     } else {
+      // Paused direct-position drag — snapshot will be saved on first actual movement.
+      this.dragSnapshotSaved = false;
       const pos = body.getPosition();
       this.dragOffset = planck.Vec2(worldPos.x - pos.x, worldPos.y - pos.y);
     }

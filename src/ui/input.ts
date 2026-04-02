@@ -54,6 +54,13 @@ export class InputHandler {
   private previewFn: (() => void) | null = null;
   private selectTool: SelectTool;
   private jointTool: JointTool;
+  private onBeforeChange: (() => void) | null;
+
+  // Stored so they can be removed in destroy()
+  private boundMouseDown: (e: MouseEvent) => void;
+  private boundMouseMove: (e: MouseEvent) => void;
+  private boundMouseUp:   (e: MouseEvent) => void;
+  private boundKeyDown:   (e: KeyboardEvent) => void;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -61,24 +68,40 @@ export class InputHandler {
     renderer: Renderer,
     toolbar: Toolbar,
     statusBar: StatusBar,
-    isSimulationRunning: () => boolean
+    isSimulationRunning: () => boolean,
+    onBeforeChange: (() => void) | null = null
   ) {
     this.canvas = canvas;
     this.world = world;
     this.renderer = renderer;
     this.toolbar = toolbar;
     this.statusBar = statusBar;
-    this.selectTool = new SelectTool(world, renderer, isSimulationRunning);
+    this.onBeforeChange = onBeforeChange;
+    this.selectTool = new SelectTool(world, renderer, isSimulationRunning, onBeforeChange);
     this.jointTool  = new JointTool(world, renderer);
+    this.jointTool.setOnBeforeChange(onBeforeChange);
     this.jointTool.onStatusChange((text) => this.statusBar.set(text));
 
     this.toolbar.onChange((tool) => this.onToolChanged(tool));
     this.onToolChanged(this.toolbar.getCurrentTool());
 
-    canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
-    window.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    window.addEventListener('mouseup',   (e) => this.onMouseUp(e));
-    window.addEventListener('keydown',   (e) => this.onKeyDown(e));
+    this.boundMouseDown = (e) => this.onMouseDown(e);
+    this.boundMouseMove = (e) => this.onMouseMove(e);
+    this.boundMouseUp   = (e) => this.onMouseUp(e);
+    this.boundKeyDown   = (e) => this.onKeyDown(e);
+
+    canvas.addEventListener('mousedown', this.boundMouseDown);
+    window.addEventListener('mousemove', this.boundMouseMove);
+    window.addEventListener('mouseup',   this.boundMouseUp);
+    window.addEventListener('keydown',   this.boundKeyDown);
+  }
+
+  /** Remove all event listeners. Call before replacing this handler with a new one. */
+  destroy(): void {
+    this.canvas.removeEventListener('mousedown', this.boundMouseDown);
+    window.removeEventListener('mousemove', this.boundMouseMove);
+    window.removeEventListener('mouseup',   this.boundMouseUp);
+    window.removeEventListener('keydown',   this.boundKeyDown);
   }
 
   getSelectTool(): SelectTool {
@@ -526,6 +549,7 @@ export class InputHandler {
   // ── Shape placement ───────────────────────────────────────────────────────
 
   private placeCircle(center: planck.Vec2, radius: number): void {
+    this.onBeforeChange?.();
     const body = this.world.createBody({ type: 'dynamic', position: center });
     body.createFixture({
       shape: new planck.CircleShape(radius),
@@ -537,6 +561,7 @@ export class InputHandler {
   }
 
   private placeBox(cornerA: planck.Vec2, cornerB: planck.Vec2): void {
+    this.onBeforeChange?.();
     const cx = (cornerA.x + cornerB.x) / 2;
     const cy = (cornerA.y + cornerB.y) / 2;
     const halfW = Math.abs(cornerB.x - cornerA.x) / 2;
@@ -552,6 +577,7 @@ export class InputHandler {
   }
 
   private placeLine(v1: planck.Vec2, v2: planck.Vec2): void {
+    this.onBeforeChange?.();
     const body = this.world.createBody({ type: 'static' });
     body.createFixture({
       shape: new planck.EdgeShape(v1, v2),
@@ -561,6 +587,7 @@ export class InputHandler {
   }
 
   private placePolygon(vertices: planck.Vec2[]): void {
+    this.onBeforeChange?.();
     // Compute centroid to use as body origin
     const cx = vertices.reduce((s, v) => s + v.x, 0) / vertices.length;
     const cy = vertices.reduce((s, v) => s + v.y, 0) / vertices.length;
@@ -578,6 +605,7 @@ export class InputHandler {
   }
 
   private placeSegments(vertices: planck.Vec2[]): void {
+    this.onBeforeChange?.();
     const body = this.world.createBody({ type: 'static' });
     body.createFixture({
       shape: new planck.ChainShape(vertices, false),

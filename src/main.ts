@@ -1,6 +1,6 @@
 import * as planck from 'planck';
 import { PhysicsWorld, WorldSettings, DEFAULT_WORLD_SETTINGS } from './physics/world';
-import { WorldSnapshot } from './physics/snapshot';
+import { UndoStack } from './physics/undoStack';
 import { serializeScene, deserializeScene } from './physics/serialization';
 import { Renderer, DEFAULT_RENDER_SETTINGS } from './rendering/renderer';
 import { Toolbar } from './ui/toolbar';
@@ -10,6 +10,8 @@ import { InputHandler } from './ui/input';
 import { PropertiesPanel } from './ui/propertiesPanel';
 import { WorldSettingsPanel } from './ui/worldSettingsPanel';
 import { attachHint } from './ui/hoverHint';
+import { playCollisionSound } from './audio/collisionSound';
+import { BodyUserData } from './types/userData';
 
 // --- Canvas: fill the container ---
 const canvas = document.getElementById('simulation-canvas') as HTMLCanvasElement;
@@ -24,7 +26,6 @@ window.addEventListener('resize', resizeCanvas);
 
 // --- Physics setup ---
 let physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
-const snapshot = new WorldSnapshot();
 
 function buildInitialScene(): void {
   const ground = physicsWorld.world.createBody({ type: 'static', position: planck.Vec2(0, -5) });
@@ -52,6 +53,38 @@ function registerJointCascade(world: planck.World): void {
 }
 registerJointCascade(physicsWorld.world);
 
+/**
+ * Register the collision-sound hook on a PhysicsWorld.
+ * When two bodies begin contact, each body with collisionSound.enabled plays its tone.
+ * Must be re-called whenever a new PhysicsWorld is created (undo, reset, load).
+ */
+function registerCollisionSounds(pw: PhysicsWorld): void {
+  pw.onCollision((contact) => {
+    const bodyA = contact.getFixtureA().getBody();
+    const bodyB = contact.getFixtureB().getBody();
+    for (const body of [bodyA, bodyB]) {
+      const userData = body.getUserData() as BodyUserData | null;
+      const sound = userData?.collisionSound;
+      if (sound?.enabled) {
+        playCollisionSound(sound.frequencyHz, sound.volume, sound.durationMs);
+      }
+    }
+  });
+}
+registerCollisionSounds(physicsWorld);
+
+// --- Undo/redo stack ---
+const undoStack = new UndoStack();
+
+/**
+ * Serialize the current scene and push it onto the undo stack.
+ * Call this BEFORE applying any user-initiated change so the previous state is saved.
+ */
+function commitUndo(): void {
+  undoStack.push(serializeScene(physicsWorld.world, physicsWorld.getSettings()));
+  updateUndoRedoButtons();
+}
+
 // --- Renderer ---
 const renderer = new Renderer(canvas, DEFAULT_RENDER_SETTINGS);
 
@@ -65,7 +98,7 @@ const worldSettingsPanelEl = document.getElementById('world-settings-panel') as 
 // StatusBar must be created first so controls and toolbar can attach hints to it
 const statusBar = new StatusBar(statusBarEl);
 
-// Simulation controls (play/pause, revert, reset) go in the top bar
+// Simulation controls (play/pause, reset) go in the top bar
 const controls = new SimulationControls(topBarEl, statusBar);
 
 // Separator between controls and select
@@ -87,6 +120,29 @@ deleteBtn.disabled = true;
 deleteBtn.addEventListener('click', () => inputHandler.getSelectTool().deleteSelected());
 topBarEl.appendChild(deleteBtn);
 
+// Undo button
+const undoBtn = document.createElement('button');
+undoBtn.className = 'top-btn';
+undoBtn.textContent = '↩ Undo';
+undoBtn.disabled = true;
+attachHint(undoBtn, 'Undo — restore the scene to before the last edit (Ctrl+Z)', statusBar);
+undoBtn.addEventListener('click', () => performUndo());
+topBarEl.appendChild(undoBtn);
+
+// Redo button
+const redoBtn = document.createElement('button');
+redoBtn.className = 'top-btn';
+redoBtn.textContent = '↪ Redo';
+redoBtn.disabled = true;
+attachHint(redoBtn, 'Redo — reapply the last undone edit (Ctrl+Y)', statusBar);
+redoBtn.addEventListener('click', () => performRedo());
+topBarEl.appendChild(redoBtn);
+
+function updateUndoRedoButtons(): void {
+  undoBtn.disabled = !undoStack.canUndo;
+  redoBtn.disabled = !undoStack.canRedo;
+}
+
 // World Settings toggle button (always available)
 const worldBtn = document.createElement('button');
 worldBtn.className = 'top-btn';
@@ -97,7 +153,7 @@ topBarEl.appendChild(worldBtn);
 const toolbar = new Toolbar(sidebarEl, selectBtn, statusBar);
 
 // Properties panel (right side — shown when a body or joint is selected)
-const propertiesPanel = new PropertiesPanel(propsPanelEl);
+const propertiesPanel = new PropertiesPanel(propsPanelEl, commitUndo);
 
 // World settings panel (left side of canvas — toggled by ⚙ World button)
 const worldSettingsPanel = new WorldSettingsPanel(
@@ -117,8 +173,41 @@ worldBtn.addEventListener('click', () => {
 });
 
 /**
+ * Restore a serialized scene (from undo/redo or a load operation).
+ * Pauses the simulation, replaces the world, and re-registers all hooks.
+ */
+function restoreScene(json: string): void {
+  const result = deserializeScene(json);
+  physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
+  registerJointCascade(physicsWorld.world);
+  registerCollisionSounds(physicsWorld);
+  propertiesPanel.hide();
+  deleteBtn.disabled = true;
+  worldSettingsPanel.refresh();
+  inputHandler.destroy();
+  inputHandler = makeInputHandler();
+  updateUndoRedoButtons();
+}
+
+function performUndo(): void {
+  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings());
+  const prevJson = undoStack.undo(currentJson);
+  if (!prevJson) return;
+  controls.pause();
+  restoreScene(prevJson);
+}
+
+function performRedo(): void {
+  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings());
+  const nextJson = undoStack.redo(currentJson);
+  if (!nextJson) return;
+  controls.pause();
+  restoreScene(nextJson);
+}
+
+/**
  * Replace the current simulation with a scene deserialized from a JSON string.
- * Resets the snapshot, hides the properties panel, and rebuilds the input handler.
+ * Clears undo history, hides the properties panel, and rebuilds the input handler.
  */
 function loadSceneFromJson(json: string): void {
   let result: { world: planck.World; settings: WorldSettings };
@@ -129,13 +218,16 @@ function loadSceneFromJson(json: string): void {
     return;
   }
   controls.pause();
-  snapshot.clear();
+  undoStack.clear();
   physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
   registerJointCascade(physicsWorld.world);
+  registerCollisionSounds(physicsWorld);
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   worldSettingsPanel.refresh();
+  inputHandler.destroy();
   inputHandler = makeInputHandler();
+  updateUndoRedoButtons();
 }
 
 // Copy scene: serialize current state to JSON and write to clipboard
@@ -173,7 +265,7 @@ loadBtn.addEventListener('click', async () => {
 topBarEl.appendChild(loadBtn);
 
 function makeInputHandler(): InputHandler {
-  const handler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning());
+  const handler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning(), commitUndo);
   handler.getSelectTool().onSelect((body) => {
     if (body) { propertiesPanel.show(body); deleteBtn.disabled = false; }
     else       { propertiesPanel.hide();    deleteBtn.disabled = true;  }
@@ -187,10 +279,9 @@ function makeInputHandler(): InputHandler {
 
 let inputHandler = makeInputHandler();
 
-// --- Play: capture snapshot on first play press per edit session ---
+// --- Play: snapshot before simulation starts so the pre-play state is undoable ---
 controls.onPlay(() => {
-  snapshot.captureIfNeeded(physicsWorld.world);
-  controls.enableRevert();
+  commitUndo();
 });
 
 // --- Pause: recall bodies that escaped the field ---
@@ -198,28 +289,37 @@ controls.onPause(() => {
   recallEscapedBodies(physicsWorld.world, physicsWorld.getSettings(), renderer);
 });
 
-// --- Revert: restore world to pre-play snapshot ---
-controls.onRevert(() => {
-  const restoredWorld = snapshot.restore();
-  if (!restoredWorld) return;
-  physicsWorld = PhysicsWorld.fromWorld(restoredWorld, DEFAULT_WORLD_SETTINGS);
-  registerJointCascade(physicsWorld.world);
-  propertiesPanel.hide();
-  deleteBtn.disabled = true;
-  worldSettingsPanel.refresh();
-  inputHandler = makeInputHandler();
-});
-
 // --- Reset: discard everything and rebuild the initial scene ---
 controls.onReset(() => {
-  snapshot.clear();
+  undoStack.clear();
   physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);
   buildInitialScene();
   registerJointCascade(physicsWorld.world);
+  registerCollisionSounds(physicsWorld);
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   worldSettingsPanel.refresh();
+  inputHandler.destroy();
   inputHandler = makeInputHandler();
+  updateUndoRedoButtons();
+});
+
+// --- Ctrl+Z / Ctrl+Y keyboard shortcuts ---
+window.addEventListener('keydown', (e) => {
+  // Don't intercept when a text-entry element has focus (let the browser handle text undo)
+  const el = document.activeElement;
+  const isTyping = el instanceof HTMLInputElement
+                || el instanceof HTMLTextAreaElement
+                || el instanceof HTMLSelectElement;
+  if (isTyping) return;
+
+  if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
+    e.preventDefault();
+    performUndo();
+  } else if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+    e.preventDefault();
+    performRedo();
+  }
 });
 
 // --- Mouse wheel zoom ---

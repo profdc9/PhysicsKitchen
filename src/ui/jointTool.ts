@@ -98,6 +98,7 @@ export class JointTool {
 
   private jointCreatedCallback: ((joint: planck.Joint) => void) | null = null;
   private statusCallback: ((text: string) => void) | null = null;
+  private onBeforeChange: (() => void) | null = null;
 
   constructor(world: planck.World, renderer: Renderer) {
     this.world = world;
@@ -110,6 +111,10 @@ export class JointTool {
 
   onStatusChange(cb: (text: string) => void): void {
     this.statusCallback = cb;
+  }
+
+  setOnBeforeChange(cb: (() => void) | null): void {
+    this.onBeforeChange = cb;
   }
 
   isActive(): boolean {
@@ -186,6 +191,7 @@ export class JointTool {
       case 'awb-bodyB': {
         const body = this.hoverBody;
         if (!body || body === this.state.bodyA) break;
+        this.onBeforeChange?.();
         this.createAWBJoint(this.state.tool, this.state.bodyA, body, this.state.anchor);
         this.activate(this.activeTool!);
         break;
@@ -223,6 +229,7 @@ export class JointTool {
       case 'axis-bodyB': {
         const body = this.hoverBody;
         if (!body || body === this.state.bodyA) break;
+        this.onBeforeChange?.();
         this.createAxisJoint(this.state.tool, this.state.bodyA, body, this.state.anchor, this.state.axis);
         this.activate(this.activeTool!);
         break;
@@ -240,6 +247,7 @@ export class JointTool {
       case 'dr-anchorB': {
         const body = this.hoverBody;
         if (!body || body === this.state.bodyA) break;
+        this.onBeforeChange?.();
         this.createDRJoint(this.state.tool, this.state.bodyA, this.state.anchorA, body, snapped);
         this.activate(this.activeTool!);
         break;
@@ -257,6 +265,7 @@ export class JointTool {
       case 'motor-bodyB': {
         const body = this.hoverBody;
         if (!body || body === this.state.bodyA) break;
+        this.onBeforeChange?.();
         this.createMotorJoint(this.state.bodyA, body);
         this.activate(this.activeTool!);
         break;
@@ -295,6 +304,7 @@ export class JointTool {
       }
       case 'pulley-groundB': {
         const { anchorA, bodyA, anchorB, bodyB, groundA } = this.state;
+        this.onBeforeChange?.();
         this.createPulleyJoint(bodyA, anchorA, bodyB, anchorB, groundA, snapped);
         this.activate(this.activeTool!);
         break;
@@ -312,6 +322,7 @@ export class JointTool {
       case 'gear-joint2': {
         const j = this.hoverJoint;
         if (!j || j === this.state.joint1) break;
+        this.onBeforeChange?.();
         this.createGearJoint(this.state.joint1, j);
         this.activate(this.activeTool!);
         break;
