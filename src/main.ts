@@ -183,6 +183,7 @@ function makeVisibilityToggle(label: string): { wrapper: HTMLElement; checkbox: 
 const { checkbox: showBodiesChk }  = makeVisibilityToggle('Bodies');
 const { checkbox: showJointsChk }  = makeVisibilityToggle('Joints');
 const { checkbox: showNamesChk }   = makeVisibilityToggle('Names');
+const { checkbox: showGridChk }    = makeVisibilityToggle('Grid');
 
 showBodiesChk.addEventListener('change', () =>
   renderer.applySettings({ showBodies: showBodiesChk.checked }));
@@ -190,6 +191,8 @@ showJointsChk.addEventListener('change', () =>
   renderer.applySettings({ showJoints: showJointsChk.checked }));
 showNamesChk.addEventListener('change', () =>
   renderer.applySettings({ showNames: showNamesChk.checked }));
+showGridChk.addEventListener('change', () =>
+  renderer.applySettings({ showGrid: showGridChk.checked }));
 
 // Sidebar toolbar (shapes + joints)
 const toolbar = new Toolbar(sidebarEl, selectBtn, statusBar);

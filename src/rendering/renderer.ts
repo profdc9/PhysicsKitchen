@@ -1,6 +1,7 @@
 import * as planck from 'planck';
 import { drawBodies, drawBodyNames } from './bodies';
 import { drawJoints } from './joints';
+import { drawGrid, drawGridScale } from './grid';
 
 // Initial pixels per meter — can be changed by zooming
 const DEFAULT_PIXELS_PER_METER = 50;
@@ -17,12 +18,14 @@ export interface RenderSettings {
   showBodies: boolean;
   showJoints: boolean;
   showNames:  boolean;
+  showGrid:   boolean;
 }
 
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   showBodies: true,
   showJoints: true,
   showNames:  true,
+  showGrid:   true,
 };
 
 export class Renderer {
@@ -113,6 +116,10 @@ export class Renderer {
 
     this.ctx.save();
 
+    if (this.settings.showGrid) {
+      drawGrid(this.ctx, this);
+    }
+
     if (this.settings.showBodies) {
       drawBodies(this.ctx, world, this);
     }
@@ -123,6 +130,11 @@ export class Renderer {
 
     if (this.settings.showNames) {
       drawBodyNames(this.ctx, world, this);
+    }
+
+    // Scale bar always drawn on top when grid is visible
+    if (this.settings.showGrid) {
+      drawGridScale(this.ctx, this);
     }
 
     this.ctx.restore();
