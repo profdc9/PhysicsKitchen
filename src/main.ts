@@ -10,7 +10,7 @@ import { InputHandler } from './ui/input';
 import { PropertiesPanel } from './ui/propertiesPanel';
 import { WorldSettingsPanel } from './ui/worldSettingsPanel';
 import { attachHint } from './ui/hoverHint';
-import { isTauriApp, saveScene, loadScene } from './platform/fileIo';
+import { isTauriApp, saveScene, loadScene as loadSceneFromFile } from './platform/fileIo';
 import { playCollisionSound } from './audio/collisionSound';
 import { applyEmForces, EmBodyState } from './physics/emForces';
 import { BodyUserData } from './types/userData';
@@ -106,7 +106,9 @@ const sidebarEl   = document.getElementById('sidebar') as HTMLElement;
 const statusBarEl = document.getElementById('status-bar') as HTMLElement;
 const propsPanelEl        = document.getElementById('properties-panel') as HTMLElement;
 const worldSettingsPanelEl = document.getElementById('world-settings-panel') as HTMLElement;
-const aboutDialog = document.getElementById('about-dialog') as HTMLDialogElement;
+const aboutDialog     = document.getElementById('about-dialog')     as HTMLDialogElement;
+const clipboardDialog = document.getElementById('clipboard-dialog') as HTMLDialogElement;
+const clipboardTextarea = document.getElementById('clipboard-textarea') as HTMLTextAreaElement;
 
 // App title
 const titleEl = document.createElement('span');
@@ -320,7 +322,7 @@ if (inTauri) {
   openFileBtn.addEventListener('click', async () => {
     let json: string | null;
     try {
-      json = await loadScene();
+      json = await loadSceneFromFile();
     } catch {
       alert('Could not open file.');
       return;
@@ -331,39 +333,31 @@ if (inTauri) {
   secondaryBarEl.appendChild(openFileBtn);
 }
 
-// Clipboard Copy button — always shown in both browser and Tauri
-const copyBtn = document.createElement('button');
-copyBtn.className = 'secondary-btn';
-copyBtn.textContent = '📋 Copy';
-attachHint(copyBtn, 'Copy scene — serialize the entire scene to JSON and copy to clipboard', statusBar);
-copyBtn.addEventListener('click', async () => {
-  const json = serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime);
-  try {
-    await navigator.clipboard.writeText(json);
-    copyBtn.textContent = '✓ Copied';
-    setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
-  } catch {
-    alert('Could not write to clipboard. Please check browser permissions.');
-  }
+// Clipboard button — opens a dialog with the current scene JSON; paste to replace
+const clipboardBtn = document.createElement('button');
+clipboardBtn.className = 'secondary-btn';
+clipboardBtn.textContent = '📋 Clipboard';
+attachHint(clipboardBtn, 'Clipboard — view or edit the scene JSON; paste a new scene and click Load', statusBar);
+clipboardBtn.addEventListener('click', () => {
+  clipboardTextarea.value = serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime);
+  clipboardDialog.showModal();
+  // Select all so the user can immediately Ctrl+C
+  clipboardTextarea.select();
 });
-secondaryBarEl.appendChild(copyBtn);
+secondaryBarEl.appendChild(clipboardBtn);
 
-// Clipboard Load button — always shown in both browser and Tauri
-const loadBtn = document.createElement('button');
-loadBtn.className = 'secondary-btn';
-loadBtn.textContent = '📋 Load';
-attachHint(loadBtn, 'Load scene — paste a scene from the clipboard and replace the current simulation', statusBar);
-loadBtn.addEventListener('click', async () => {
-  let json: string;
-  try {
-    json = await navigator.clipboard.readText();
-  } catch {
-    alert('Could not read from clipboard. Please check browser permissions.');
-    return;
-  }
-  loadSceneFromJson(json);
+document.getElementById('clipboard-load-btn')!.addEventListener('click', () => {
+  clipboardDialog.close();
+  loadSceneFromJson(clipboardTextarea.value);
 });
-secondaryBarEl.appendChild(loadBtn);
+
+document.getElementById('clipboard-cancel-btn')!.addEventListener('click', () => {
+  clipboardDialog.close();
+});
+
+clipboardDialog.addEventListener('click', (e) => {
+  if (e.target === clipboardDialog) clipboardDialog.close();
+});
 
 // About button
 const aboutBtn = document.createElement('button');
