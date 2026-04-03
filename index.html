@@ -166,11 +166,26 @@
         align-items: center;
         gap: 6px;
         padding: 4px 8px;
-        background: #222;
+        background: #1c1c1c;
         border-bottom: 1px solid #444;
         flex-shrink: 0;
         flex-wrap: wrap;
       }
+
+      /* Like .sidebar-btn but auto-width for horizontal placement */
+      .secondary-btn {
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 5px 8px;
+        cursor: pointer;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .secondary-btn:hover  { background: #383838; color: #fff; }
+      .secondary-btn.active { background: #334; color: #fff; border-color: #88f; }
 
       /* ── Left sidebar: shape + joint tools ── */
       #sidebar {

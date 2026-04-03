@@ -297,7 +297,7 @@ function loadSceneFromJson(json: string): void {
 
 // Save / Copy button — file dialog in Tauri, clipboard in browser
 const saveBtn = document.createElement('button');
-saveBtn.className = 'top-btn';
+saveBtn.className = 'secondary-btn';
 const inTauri = isTauriApp();
 saveBtn.textContent = inTauri ? '💾 Save' : '📋 Copy';
 attachHint(
@@ -324,7 +324,7 @@ secondaryBarEl.appendChild(saveBtn);
 
 // Open / Load button — file dialog in Tauri, clipboard in browser
 const loadBtn = document.createElement('button');
-loadBtn.className = 'top-btn';
+loadBtn.className = 'secondary-btn';
 loadBtn.textContent = inTauri ? '📂 Open' : '📂 Load';
 attachHint(
   loadBtn,
@@ -348,7 +348,7 @@ secondaryBarEl.appendChild(loadBtn);
 
 // About button
 const aboutBtn = document.createElement('button');
-aboutBtn.className = 'top-btn';
+aboutBtn.className = 'secondary-btn';
 aboutBtn.textContent = 'ℹ About';
 aboutBtn.addEventListener('click', () => aboutDialog.showModal());
 secondaryBarEl.appendChild(aboutBtn);
