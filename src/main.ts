@@ -295,53 +295,72 @@ function loadSceneFromJson(json: string): void {
   updateUndoRedoButtons();
 }
 
-// Save / Copy button — file dialog in Tauri, clipboard in browser
-const saveBtn = document.createElement('button');
-saveBtn.className = 'secondary-btn';
 const inTauri = isTauriApp();
-saveBtn.textContent = inTauri ? '💾 Save' : '📋 Copy';
-attachHint(
-  saveBtn,
-  inTauri
-    ? 'Save scene — save the current scene to a file'
-    : 'Copy scene — serialize the entire scene to JSON and copy to clipboard',
-  statusBar,
-);
-saveBtn.addEventListener('click', async () => {
+
+// In Tauri: native file Save / Open buttons
+if (inTauri) {
+  const saveFileBtn = document.createElement('button');
+  saveFileBtn.className = 'secondary-btn';
+  saveFileBtn.textContent = '💾 Save';
+  attachHint(saveFileBtn, 'Save scene — save the current scene to a file', statusBar);
+  saveFileBtn.addEventListener('click', async () => {
+    const json = serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime);
+    try {
+      await saveScene(json);
+    } catch {
+      alert('Could not save file.');
+    }
+  });
+  secondaryBarEl.appendChild(saveFileBtn);
+
+  const openFileBtn = document.createElement('button');
+  openFileBtn.className = 'secondary-btn';
+  openFileBtn.textContent = '📂 Open';
+  attachHint(openFileBtn, 'Open scene — load a scene from a file', statusBar);
+  openFileBtn.addEventListener('click', async () => {
+    let json: string | null;
+    try {
+      json = await loadScene();
+    } catch {
+      alert('Could not open file.');
+      return;
+    }
+    if (json === null) return;
+    loadSceneFromJson(json);
+  });
+  secondaryBarEl.appendChild(openFileBtn);
+}
+
+// Clipboard Copy button — always shown in both browser and Tauri
+const copyBtn = document.createElement('button');
+copyBtn.className = 'secondary-btn';
+copyBtn.textContent = '📋 Copy';
+attachHint(copyBtn, 'Copy scene — serialize the entire scene to JSON and copy to clipboard', statusBar);
+copyBtn.addEventListener('click', async () => {
   const json = serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime);
   try {
-    const saved = await saveScene(json);
-    if (saved && !inTauri) {
-      // Browser: give a brief visual confirmation
-      saveBtn.textContent = '✓ Copied';
-      setTimeout(() => { saveBtn.textContent = '📋 Copy'; }, 1500);
-    }
+    await navigator.clipboard.writeText(json);
+    copyBtn.textContent = '✓ Copied';
+    setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
   } catch {
-    alert(inTauri ? 'Could not save file.' : 'Could not write to clipboard. Please check browser permissions.');
+    alert('Could not write to clipboard. Please check browser permissions.');
   }
 });
-secondaryBarEl.appendChild(saveBtn);
+secondaryBarEl.appendChild(copyBtn);
 
-// Open / Load button — file dialog in Tauri, clipboard in browser
+// Clipboard Load button — always shown in both browser and Tauri
 const loadBtn = document.createElement('button');
 loadBtn.className = 'secondary-btn';
-loadBtn.textContent = inTauri ? '📂 Open' : '📂 Load';
-attachHint(
-  loadBtn,
-  inTauri
-    ? 'Open scene — load a scene from a file'
-    : 'Load scene — paste a scene from the clipboard and replace the current simulation',
-  statusBar,
-);
+loadBtn.textContent = '📋 Load';
+attachHint(loadBtn, 'Load scene — paste a scene from the clipboard and replace the current simulation', statusBar);
 loadBtn.addEventListener('click', async () => {
-  let json: string | null;
+  let json: string;
   try {
-    json = await loadScene();
+    json = await navigator.clipboard.readText();
   } catch {
-    alert(inTauri ? 'Could not open file.' : 'Could not read from clipboard. Please check browser permissions.');
+    alert('Could not read from clipboard. Please check browser permissions.');
     return;
   }
-  if (json === null) return;   // user cancelled the file dialog
   loadSceneFromJson(json);
 });
 secondaryBarEl.appendChild(loadBtn);
