@@ -43,20 +43,21 @@
       #top-bar .top-btn.active { background: #556; color: #fff; border-color: #88f; }
       #top-bar .top-btn:disabled { opacity: 0.35; cursor: default; }
 
-      #top-bar .top-visibility-toggle {
+      .top-visibility-toggle {
         display: flex;
         align-items: center;
         gap: 4px;
-        color: #bbb;
+        color: #999;
         font-size: 12px;
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
       }
-      #top-bar .top-visibility-toggle input[type="checkbox"] {
+      .top-visibility-toggle input[type="checkbox"] {
         accent-color: #88f;
         cursor: pointer;
       }
+      .top-visibility-toggle:hover { color: #ccc; }
 
       #top-bar .app-title {
         font-size: 15px;
