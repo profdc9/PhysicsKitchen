@@ -6,6 +6,9 @@ export interface BodyUserData {
   /** CSS color string for rendering this body. If absent, default color for body type is used. */
   color?: string;
 
+  /** Optional display name shown on top of the body when names are visible. */
+  name?: string;
+
   /**
    * Records which tool created this body so editing handles know whether to treat a
    * 4-vertex PolygonShape as a box (two corner handles) or a free polygon (per-vertex handles).

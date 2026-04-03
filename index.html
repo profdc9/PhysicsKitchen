@@ -43,6 +43,21 @@
       #top-bar .top-btn.active { background: #556; color: #fff; border-color: #88f; }
       #top-bar .top-btn:disabled { opacity: 0.35; cursor: default; }
 
+      #top-bar .top-visibility-toggle {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #bbb;
+        font-size: 12px;
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+      }
+      #top-bar .top-visibility-toggle input[type="checkbox"] {
+        accent-color: #88f;
+        cursor: pointer;
+      }
+
       #top-bar .separator {
         width: 1px;
         height: 22px;
@@ -195,6 +210,17 @@
         min-width: 0;
         accent-color: #88f;
       }
+
+      .prop-text {
+        width: 120px;
+        background: #2a2a2a;
+        color: #ccc;
+        border: 1px solid #555;
+        border-radius: 3px;
+        padding: 2px 4px;
+        font-size: 11px;
+      }
+      .prop-text::placeholder { color: #666; }
 
       .prop-number {
         width: 60px;

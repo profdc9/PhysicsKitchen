@@ -93,6 +93,14 @@ export class PropertiesPanel {
 
     this.addHeading('Body Properties');
 
+    // ── Name ─────────────────────────────────────────────────────────────────
+
+    this.addTextField('Name', userData.name ?? '', (val) => {
+      this.setUserData(body, { name: val || undefined });
+    });
+
+    this.addSeparator();
+
     // ── Appearance & type ────────────────────────────────────────────────────
 
     const color = userData.color ?? this.defaultColor(body);
@@ -463,6 +471,19 @@ export class PropertiesPanel {
     const s = document.createElement('div');
     s.className = 'prop-separator';
     this.container.appendChild(s);
+  }
+
+  private addTextField(label: string, value: string, onChange: (val: string) => void): void {
+    const row = this.makeRow(label);
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.className = 'prop-text';
+    input.placeholder = '(none)';
+    input.addEventListener('focus', () => this.onBeforeChange?.());
+    input.addEventListener('change', () => onChange(input.value.trim()));
+    row.appendChild(input);
+    this.container.appendChild(row);
   }
 
   private addColorPicker(label: string, value: string, onChange: (val: string) => void): void {

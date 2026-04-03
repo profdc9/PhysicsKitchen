@@ -1,5 +1,5 @@
 import * as planck from 'planck';
-import { drawBodies } from './bodies';
+import { drawBodies, drawBodyNames } from './bodies';
 import { drawJoints } from './joints';
 
 // Initial pixels per meter — can be changed by zooming
@@ -16,11 +16,13 @@ const BACKGROUND_COLOR = '#1a1a2e';
 export interface RenderSettings {
   showBodies: boolean;
   showJoints: boolean;
+  showNames:  boolean;
 }
 
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   showBodies: true,
   showJoints: true,
+  showNames:  true,
 };
 
 export class Renderer {
@@ -117,6 +119,10 @@ export class Renderer {
 
     if (this.settings.showJoints) {
       drawJoints(this.ctx, world, this, selectedJoint);
+    }
+
+    if (this.settings.showNames) {
+      drawBodyNames(this.ctx, world, this);
     }
 
     this.ctx.restore();

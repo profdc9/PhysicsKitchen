@@ -3,12 +3,19 @@ import { Renderer } from './renderer';
 import { BodyUserData } from '../types/userData';
 
 // Colors for each body type
-const COLOR_DYNAMIC = '#e0e0ff';
-const COLOR_STATIC = '#80c080';
+const COLOR_DYNAMIC   = '#e0e0ff';
+const COLOR_STATIC    = '#80c080';
 const COLOR_KINEMATIC = '#c0a0e0';
-const COLOR_STROKE = '#ffffff';
-const STROKE_WIDTH = 1.5;
+const COLOR_STROKE    = '#ffffff';
+const STROKE_WIDTH      = 1.5;
 const LINE_STROKE_WIDTH = 3;   // heavier stroke for edge and chain shapes
+
+// Body name label style
+const NAME_FONT        = 'bold 12px sans-serif';
+const NAME_TEXT_COLOR  = '#ffffff';
+const NAME_BG_COLOR    = 'rgba(0, 0, 0, 0.55)';
+const NAME_PADDING_X   = 4;   // px horizontal padding inside the background pill
+const NAME_PADDING_Y   = 2;   // px vertical padding
 
 export function drawBodies(
   ctx: CanvasRenderingContext2D,
@@ -151,4 +158,42 @@ function getBodyColor(body: planck.Body): string {
     case 'kinematic': return COLOR_KINEMATIC;
     case 'dynamic':   return COLOR_DYNAMIC;
   }
+}
+
+/**
+ * Draw the name label for every body that has a non-empty name.
+ * Labels are centered on the body's position (centroid) and drawn
+ * on top of everything else so they remain readable at any zoom.
+ */
+export function drawBodyNames(
+  ctx: CanvasRenderingContext2D,
+  world: planck.World,
+  renderer: Renderer,
+): void {
+  ctx.save();
+  ctx.font = NAME_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (let body = world.getBodyList(); body; body = body.getNext()) {
+    const userData = body.getUserData() as BodyUserData | null;
+    const name = userData?.name;
+    if (!name) continue;
+
+    const cp = renderer.worldToCanvas(body.getPosition());
+    const textW = ctx.measureText(name).width;
+    const bgW   = textW + NAME_PADDING_X * 2;
+    const bgH   = 16 + NAME_PADDING_Y * 2;   // 16px ≈ font cap height at 12px
+
+    // Semi-transparent pill background for readability
+    ctx.fillStyle = NAME_BG_COLOR;
+    ctx.beginPath();
+    ctx.roundRect(cp.x - bgW / 2, cp.y - bgH / 2, bgW, bgH, bgH / 2);
+    ctx.fill();
+
+    ctx.fillStyle = NAME_TEXT_COLOR;
+    ctx.fillText(name, cp.x, cp.y);
+  }
+
+  ctx.restore();
 }

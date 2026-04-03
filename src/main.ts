@@ -159,8 +159,47 @@ worldBtn.className = 'top-btn';
 worldBtn.textContent = '⚙ World';
 topBarEl.appendChild(worldBtn);
 
+// ── Visibility toggles ───────────────────────────────────────────────────────
+
+function makeVisibilityToggle(label: string): { wrapper: HTMLElement; checkbox: HTMLInputElement } {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'top-visibility-toggle';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = true;
+  wrapper.appendChild(checkbox);
+  wrapper.appendChild(document.createTextNode(label));
+  topBarEl.appendChild(wrapper);
+  return { wrapper, checkbox };
+}
+
+const { checkbox: showBodiesChk }  = makeVisibilityToggle('Bodies');
+const { checkbox: showJointsChk }  = makeVisibilityToggle('Joints');
+const { checkbox: showNamesChk }   = makeVisibilityToggle('Names');
+
+showBodiesChk.addEventListener('change', () =>
+  renderer.applySettings({ showBodies: showBodiesChk.checked }));
+showJointsChk.addEventListener('change', () =>
+  renderer.applySettings({ showJoints: showJointsChk.checked }));
+showNamesChk.addEventListener('change', () =>
+  renderer.applySettings({ showNames: showNamesChk.checked }));
+
 // Sidebar toolbar (shapes + joints)
 const toolbar = new Toolbar(sidebarEl, selectBtn, statusBar);
+
+// While a joint placement tool is active, bodies must always be shown so the
+// user can click them to place joints.  Gray out the Bodies checkbox during that time.
+const JOINT_TOOL_NAMES = new Set([
+  'revolute-joint', 'weld-joint', 'prismatic-joint', 'distance-joint',
+  'rope-joint', 'pulley-joint', 'gear-joint', 'wheel-joint',
+  'friction-joint', 'motor-joint',
+]);
+toolbar.onChange((tool) => {
+  const jointActive = JOINT_TOOL_NAMES.has(tool);
+  showBodiesChk.disabled = jointActive;
+  (showBodiesChk.parentElement as HTMLElement).style.opacity = jointActive ? '0.4' : '';
+  if (jointActive) renderer.applySettings({ showBodies: true });
+});
 
 // Properties panel (right side — shown when a body or joint is selected)
 const propertiesPanel = new PropertiesPanel(propsPanelEl, commitUndo);
