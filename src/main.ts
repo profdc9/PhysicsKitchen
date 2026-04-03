@@ -104,6 +104,13 @@ const sidebarEl   = document.getElementById('sidebar') as HTMLElement;
 const statusBarEl = document.getElementById('status-bar') as HTMLElement;
 const propsPanelEl        = document.getElementById('properties-panel') as HTMLElement;
 const worldSettingsPanelEl = document.getElementById('world-settings-panel') as HTMLElement;
+const aboutDialog = document.getElementById('about-dialog') as HTMLDialogElement;
+
+// App title
+const titleEl = document.createElement('span');
+titleEl.className = 'app-title';
+titleEl.textContent = 'PhysicsKitchen';
+topBarEl.appendChild(titleEl);
 
 // StatusBar must be created first so controls and toolbar can attach hints to it
 const statusBar = new StatusBar(statusBarEl);
@@ -316,6 +323,21 @@ loadBtn.addEventListener('click', async () => {
   loadSceneFromJson(json);
 });
 topBarEl.appendChild(loadBtn);
+
+// About button
+const aboutBtn = document.createElement('button');
+aboutBtn.className = 'top-btn';
+aboutBtn.textContent = 'ℹ About';
+aboutBtn.addEventListener('click', () => aboutDialog.showModal());
+topBarEl.appendChild(aboutBtn);
+
+document.getElementById('about-close-btn')!
+  .addEventListener('click', () => aboutDialog.close());
+
+// Close on click outside the dialog content
+aboutDialog.addEventListener('click', (e) => {
+  if (e.target === aboutDialog) aboutDialog.close();
+});
 
 function makeInputHandler(): InputHandler {
   const handler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning(), commitUndo);

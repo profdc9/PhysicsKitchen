@@ -58,6 +58,86 @@
         cursor: pointer;
       }
 
+      #top-bar .app-title {
+        font-size: 15px;
+        font-weight: bold;
+        color: #ccddff;
+        letter-spacing: 0.03em;
+        margin-right: 4px;
+        white-space: nowrap;
+        user-select: none;
+      }
+
+      /* ── About dialog ── */
+      #about-dialog {
+        background: #1e1e2e;
+        color: #ccc;
+        border: 1px solid #555;
+        border-radius: 8px;
+        padding: 0;
+        max-width: 560px;
+        width: 90vw;
+        max-height: 80vh;
+      }
+      #about-dialog::backdrop {
+        background: rgba(0, 0, 0, 0.6);
+      }
+      #about-content {
+        padding: 24px 28px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        overflow-y: auto;
+        max-height: 78vh;
+      }
+      #about-content h2 {
+        margin: 0;
+        font-size: 20px;
+        color: #ccddff;
+        letter-spacing: 0.04em;
+      }
+      #about-content p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .about-copyright {
+        color: #aaa;
+        font-size: 12px !important;
+      }
+      .about-license {
+        font-size: 10px;
+        font-family: monospace;
+        background: #141420;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 10px 12px;
+        margin: 0;
+        white-space: pre-wrap;
+        color: #999;
+        line-height: 1.5;
+      }
+      .about-hr {
+        border: none;
+        border-top: 1px solid #444;
+        margin: 4px 0;
+      }
+      #about-close-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
+      #about-close-btn {
+        background: #333;
+        color: #ccc;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 5px 20px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      #about-close-btn:hover { background: #444; color: #fff; }
+
       #top-bar .separator {
         width: 1px;
         height: 22px;
@@ -331,6 +411,62 @@
   </head>
   <body>
     <div id="top-bar"></div>
+
+    <dialog id="about-dialog">
+      <div id="about-content">
+        <h2>PhysicsKitchen</h2>
+        <p>An interactive 2D physics sandbox with electromagnetic simulation.</p>
+        <p class="about-copyright">Copyright &copy; 2026 by Daniel L. Marks</p>
+        <pre class="about-license">The MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.</pre>
+
+        <hr class="about-hr"/>
+
+        <p>This software uses <strong>planck.js</strong> (a JavaScript port of Box2D).</p>
+        <p class="about-copyright">Copyright &copy; Erin Catto, Ali Shakiba</p>
+        <pre class="about-license">The MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.</pre>
+
+        <div id="about-close-row">
+          <button id="about-close-btn">Close</button>
+        </div>
+      </div>
+    </dialog>
+
     <div id="main">
       <div id="sidebar"></div>
       <div id="canvas-container">
