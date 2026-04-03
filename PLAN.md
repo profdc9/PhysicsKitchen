@@ -45,20 +45,7 @@ Separate panel (floats on left side of canvas), toggled by "⚙ World" button in
 - Electromagnetic section: Wire Depth, Max Distance, Min Distance clamp
 - Collapsible "Expert" section: 8 `planck.Settings` tolerance fields + "Reset to Defaults" button
 
-### 11. Force Link ✓
-Pairwise power-law force interaction between two bodies, managed like a joint (rendered, selectable, deletable, serialized, undo/redo).
-
-- **Force law:** `F = k · (r − L₀)^n` along centroid-to-centroid unit vector; positive k = attractive
-- **Parameters:** coefficient k, exponent n (−2 = gravity-like, 1 = spring), rest length L₀, minDistance clamp, maxDistance cutoff (0 = no limit)
-- **Placement:** `ForceLinkTool` two-phase click flow (click Body A → click Body B); sidebar "Forces" group
-- **Rendering:** dashed purple line between centroids, midpoint "ƒ" marker; selected link turns green
-- **Selection:** midpoint hit-test in SelectTool (higher priority than joint anchors); `onForceLinkSelect` callback shows properties panel
-- **Properties panel:** all 5 parameters editable; in-panel delete button
-- **Deletion:** Delete key or in-panel button; removes from `forceLinks[]` array; body deletion auto-removes referencing links via `remove-body` hook
-- **Serialization:** `forceLinks?: SerializedForceLink[]` in SceneFile; bodies stored by index in `buildBodyList()` order; round-trips correctly through undo/redo, Copy/Load, and `?scene=` URL
-- **Simulation:** `applyForceLinks(forceLinks)` called before each `world.step()`; edge cases handled (r=0, effective≤0 with n<0, beyond maxDistance)
-
-## Completed (continued)
+## Remaining Tasks (in order)
 
 ### 6. Serialization ✓
 - Custom `planck.Serializer` instance with postSerialize/postDeserialize hooks injects and restores `pkUserData` (color, shapeKind, collision sound, EM props) on each body.

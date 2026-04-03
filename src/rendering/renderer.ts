@@ -1,8 +1,6 @@
 import * as planck from 'planck';
 import { drawBodies } from './bodies';
 import { drawJoints } from './joints';
-import { drawForceLinks } from './forceLinks';
-import { ForceLink } from '../physics/forceLinks';
 
 // Initial pixels per meter — can be changed by zooming
 const DEFAULT_PIXELS_PER_METER = 50;
@@ -108,12 +106,7 @@ export class Renderer {
   }
 
   /** Clear the canvas and draw all world objects. */
-  draw(
-    world: planck.World,
-    selectedJoint: planck.Joint | null = null,
-    forceLinks: ForceLink[] = [],
-    selectedForceLink: ForceLink | null = null,
-  ): void {
+  draw(world: planck.World, selectedJoint: planck.Joint | null = null): void {
     this.clear();
 
     this.ctx.save();
@@ -125,9 +118,6 @@ export class Renderer {
     if (this.settings.showJoints) {
       drawJoints(this.ctx, world, this, selectedJoint);
     }
-
-    // Force links are always drawn (not gated on showJoints)
-    drawForceLinks(this.ctx, forceLinks, this, selectedForceLink);
 
     this.ctx.restore();
   }

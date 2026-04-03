@@ -17,8 +17,7 @@ export type ToolType =
   | 'gear-joint'
   | 'wheel-joint'
   | 'friction-joint'
-  | 'motor-joint'
-  | 'force-link';
+  | 'motor-joint';
 
 type ToolChangeCallback = (tool: ToolType) => void;
 
@@ -38,7 +37,6 @@ const SIDEBAR_TOOL_LABELS: Record<Exclude<ToolType, 'select'>, string> = {
   'wheel-joint':     '◎ Wheel',
   'friction-joint':  '✦ Friction',
   'motor-joint':     '↻ Motor',
-  'force-link':      'ƒ Force Link',
 };
 
 const SIDEBAR_TOOL_HINTS: Record<Exclude<ToolType, 'select'>, string> = {
@@ -57,7 +55,6 @@ const SIDEBAR_TOOL_HINTS: Record<Exclude<ToolType, 'select'>, string> = {
   'wheel-joint':     'Wheel joint — suspension spring with free rotation; ideal for vehicle wheels (chassis + wheel)',
   'friction-joint':  'Friction joint — applies 2D translational and angular friction between two bodies at an anchor point',
   'motor-joint':     'Motor joint — drives one body toward a target position and angle relative to another, like a servo',
-  'force-link':      'Force link — applies a configurable power-law force F = k·(r−L₀)ⁿ between two bodies; click Body A then Body B',
 };
 
 export class Toolbar {
@@ -100,13 +97,6 @@ export class Toolbar {
     for (const tool of jointTools) {
       container.appendChild(this.makeButton(tool, statusBar));
     }
-
-    const forceLabel = document.createElement('div');
-    forceLabel.className = 'sidebar-group-label';
-    forceLabel.textContent = 'Forces';
-    container.appendChild(forceLabel);
-
-    container.appendChild(this.makeButton('force-link', statusBar));
   }
 
   private makeButton(tool: Exclude<ToolType, 'select'>, statusBar: StatusBar): HTMLButtonElement {

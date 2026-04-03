@@ -2,8 +2,6 @@ import * as planck from 'planck';
 import { Renderer } from '../rendering/renderer';
 import { BodyHandles, CanvasPt } from './bodyHandles';
 import { getJointAnchorPoints, ANCHOR_HIT_PX } from '../rendering/joints';
-import { ForceLink } from '../physics/forceLinks';
-import { hitTestForceLink } from '../rendering/forceLinks';
 
 // Larger hit radius for joint selection than for the rendered dot — easier to click.
 const JOINT_SELECT_HIT_PX = 14;
@@ -45,12 +43,6 @@ export class SelectTool {
 
   private selectedJoint: planck.Joint | null = null;
   private onJointSelectCallback: ((joint: planck.Joint | null) => void) | null = null;
-
-  private selectedForceLink: ForceLink | null = null;
-  private onForceLinkSelectCallback: ((link: ForceLink | null) => void) | null = null;
-  private onForceLinkDeleteCallback: ((link: ForceLink) => void) | null = null;
-  // External source for the current force-links array (set by main.ts)
-  private getForceLinksFn: (() => ForceLink[]) | null = null;
 
   private handles: BodyHandles;
 
@@ -100,38 +92,12 @@ export class SelectTool {
     this.onJointSelectCallback = callback;
   }
 
-  onForceLinkSelect(callback: (link: ForceLink | null) => void): void {
-    this.onForceLinkSelectCallback = callback;
-  }
-
-  /** Called when the user deletes the currently selected ForceLink. */
-  onForceLinkDelete(callback: (link: ForceLink) => void): void {
-    this.onForceLinkDeleteCallback = callback;
-  }
-
-  /** Provide a getter so SelectTool can read the current force-links array for hit-testing. */
-  setForceLinksSource(fn: () => ForceLink[]): void {
-    this.getForceLinksFn = fn;
-  }
-
-  getSelectedForceLink(): ForceLink | null {
-    return this.selectedForceLink;
-  }
-
   /**
    * Destroy the currently selected body or joint and clear the selection.
    * Returns true if something was deleted, false if nothing was selected.
    * The world's remove-body/remove-joint hooks handle any application-level cleanup.
    */
   deleteSelected(): boolean {
-    if (this.selectedForceLink) {
-      this.onBeforeChange?.();
-      const link = this.selectedForceLink;
-      this.selectedForceLink = null;
-      this.onForceLinkDeleteCallback?.(link);   // main.ts removes it from the array
-      this.onForceLinkSelectCallback?.(null);
-      return true;
-    }
     if (this.selectedJoint) {
       this.onBeforeChange?.();
       this.world.destroyJoint(this.selectedJoint);
@@ -156,39 +122,21 @@ export class SelectTool {
   deactivate(): void {
     this.endDrag();
     this.handles.setBody(null);
-    this.selectedBody      = null;
-    this.selectedJoint     = null;
-    this.selectedForceLink = null;
+    this.selectedBody = null;
+    this.selectedJoint = null;
     this.onSelectCallback?.(null);
     this.onJointSelectCallback?.(null);
-    this.onForceLinkSelectCallback?.(null);
   }
 
   onMouseDown(worldPos: planck.Vec2, canvasPt: CanvasPt): void {
-    // Force-link midpoint markers take priority (drawn on top, small target)
-    const forceLinks = this.getForceLinksFn?.() ?? [];
-    const forceLinkHit = hitTestForceLink(canvasPt, forceLinks, this.renderer);
-    if (forceLinkHit) {
-      this.selectedForceLink = forceLinkHit;
-      this.selectedBody      = null;
-      this.selectedJoint     = null;
-      this.handles.setBody(null);
-      this.onSelectCallback?.(null);
-      this.onJointSelectCallback?.(null);
-      this.onForceLinkSelectCallback?.(forceLinkHit);
-      return;
-    }
-
-    // Joint anchors take the next priority — they are drawn on top of bodies
+    // Joint anchors take the highest priority — they are drawn on top of bodies
     // and must be selectable even when a body handle is nearby.
     const jointHit = this.hitTestJoint(canvasPt);
     if (jointHit) {
-      this.selectedJoint     = jointHit;
-      this.selectedBody      = null;
-      this.selectedForceLink = null;
+      this.selectedJoint = jointHit;
+      this.selectedBody  = null;
       this.handles.setBody(null);
       this.onSelectCallback?.(null);
-      this.onForceLinkSelectCallback?.(null);
       this.onJointSelectCallback?.(jointHit);
       return;
     }
@@ -198,18 +146,14 @@ export class SelectTool {
 
     const bodyHit = this.hitTest(worldPos);
     if (bodyHit) {
-      this.selectedBody      = bodyHit;
-      this.selectedJoint     = null;
-      this.selectedForceLink = null;
+      this.selectedBody  = bodyHit;
+      this.selectedJoint = null;
       this.beginDrag(bodyHit, worldPos);
       this.onJointSelectCallback?.(null);
-      this.onForceLinkSelectCallback?.(null);
     } else {
-      this.selectedBody      = null;
-      this.selectedJoint     = null;
-      this.selectedForceLink = null;
+      this.selectedBody  = null;
+      this.selectedJoint = null;
       this.onJointSelectCallback?.(null);
-      this.onForceLinkSelectCallback?.(null);
     }
     this.handles.setBody(this.selectedBody);
     this.onSelectCallback?.(this.selectedBody);

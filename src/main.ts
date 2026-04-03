@@ -12,7 +12,6 @@ import { WorldSettingsPanel } from './ui/worldSettingsPanel';
 import { attachHint } from './ui/hoverHint';
 import { playCollisionSound } from './audio/collisionSound';
 import { applyEmForces, EmBodyState } from './physics/emForces';
-import { applyForceLinks, ForceLink } from './physics/forceLinks';
 import { BodyUserData } from './types/userData';
 
 // --- Canvas: fill the container ---
@@ -87,16 +86,12 @@ let simTime = 0;
 // Runtime per-body EM state for inductive bodies; cleared whenever the world changes.
 let emBodyState = new Map<planck.Body, EmBodyState>();
 
-// --- Force links ---
-// Pairwise power-law force interactions that live outside planck.js.
-let forceLinks: ForceLink[] = [];
-
 /**
  * Serialize the current scene and push it onto the undo stack.
  * Call this BEFORE applying any user-initiated change so the previous state is saved.
  */
 function commitUndo(): void {
-  undoStack.push(serializeScene(physicsWorld.world, physicsWorld.getSettings(), forceLinks));
+  undoStack.push(serializeScene(physicsWorld.world, physicsWorld.getSettings()));
   updateUndoRedoButtons();
 }
 
@@ -196,9 +191,8 @@ function restoreScene(json: string): void {
   physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
   registerJointCascade(physicsWorld.world);
   registerCollisionSounds(physicsWorld);
-  simTime     = 0;
+  simTime    = 0;
   emBodyState = new Map();
-  forceLinks  = result.forceLinks;
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   worldSettingsPanel.refresh();
@@ -208,7 +202,7 @@ function restoreScene(json: string): void {
 }
 
 function performUndo(): void {
-  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings(), forceLinks);
+  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings());
   const prevJson = undoStack.undo(currentJson);
   if (!prevJson) return;
   controls.pause();
@@ -216,7 +210,7 @@ function performUndo(): void {
 }
 
 function performRedo(): void {
-  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings(), forceLinks);
+  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings());
   const nextJson = undoStack.redo(currentJson);
   if (!nextJson) return;
   controls.pause();
@@ -228,7 +222,7 @@ function performRedo(): void {
  * Clears undo history, hides the properties panel, and rebuilds the input handler.
  */
 function loadSceneFromJson(json: string): void {
-  let result: { world: planck.World; settings: WorldSettings; forceLinks: ForceLink[] };
+  let result: { world: planck.World; settings: WorldSettings };
   try {
     result = deserializeScene(json);
   } catch (err) {
@@ -240,9 +234,8 @@ function loadSceneFromJson(json: string): void {
   physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
   registerJointCascade(physicsWorld.world);
   registerCollisionSounds(physicsWorld);
-  simTime     = 0;
+  simTime    = 0;
   emBodyState = new Map();
-  forceLinks  = result.forceLinks;
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   worldSettingsPanel.refresh();
@@ -257,7 +250,7 @@ copyBtn.className = 'top-btn';
 copyBtn.textContent = '📋 Copy';
 attachHint(copyBtn, 'Copy scene — serialize the entire scene to JSON and copy to clipboard', statusBar);
 copyBtn.addEventListener('click', async () => {
-  const json = serializeScene(physicsWorld.world, physicsWorld.getSettings(), forceLinks);
+  const json = serializeScene(physicsWorld.world, physicsWorld.getSettings());
   try {
     await navigator.clipboard.writeText(json);
     copyBtn.textContent = '✓ Copied';
@@ -286,59 +279,15 @@ loadBtn.addEventListener('click', async () => {
 topBarEl.appendChild(loadBtn);
 
 function makeInputHandler(): InputHandler {
-  const onForceLinkCommit = (link: ForceLink) => {
-    commitUndo();
-    forceLinks.push(link);
-  };
-
-  const handler = new InputHandler(
-    canvas, physicsWorld.world, renderer, toolbar, statusBar,
-    () => controls.isRunning(), commitUndo, onForceLinkCommit,
-  );
-
-  const selectTool = handler.getSelectTool();
-
-  selectTool.setForceLinksSource(() => forceLinks);
-
-  selectTool.onSelect((body) => {
+  const handler = new InputHandler(canvas, physicsWorld.world, renderer, toolbar, statusBar, () => controls.isRunning(), commitUndo);
+  handler.getSelectTool().onSelect((body) => {
     if (body) { propertiesPanel.show(body); deleteBtn.disabled = false; }
     else       { propertiesPanel.hide();    deleteBtn.disabled = true;  }
   });
-
-  selectTool.onJointSelect((joint) => {
+  handler.getSelectTool().onJointSelect((joint) => {
     if (joint) { propertiesPanel.showJoint(joint); deleteBtn.disabled = false; }
     else        { propertiesPanel.hide();           deleteBtn.disabled = true;  }
   });
-
-  selectTool.onForceLinkSelect((link) => {
-    if (link) {
-      propertiesPanel.showForceLink(link, () => {
-        // Delete button inside the properties panel
-        commitUndo();
-        forceLinks = forceLinks.filter(fl => fl !== link);
-        selectTool.deactivate();
-        propertiesPanel.hide();
-        deleteBtn.disabled = true;
-      });
-      deleteBtn.disabled = false;
-    } else {
-      propertiesPanel.hide();
-      deleteBtn.disabled = true;
-    }
-  });
-
-  selectTool.onForceLinkDelete((link) => {
-    // Delete key shortcut — undo already committed by deleteSelected()
-    forceLinks = forceLinks.filter(fl => fl !== link);
-    propertiesPanel.hide();
-    deleteBtn.disabled = true;
-  });
-
-  // Remove force links referencing a deleted body
-  physicsWorld.world.on('remove-body', (removedBody) => {
-    forceLinks = forceLinks.filter(fl => fl.bodyA !== removedBody && fl.bodyB !== removedBody);
-  });
-
   return handler;
 }
 
@@ -361,9 +310,8 @@ controls.onReset(() => {
   buildInitialScene();
   registerJointCascade(physicsWorld.world);
   registerCollisionSounds(physicsWorld);
-  simTime     = 0;
+  simTime    = 0;
   emBodyState = new Map();
-  forceLinks  = [];
   propertiesPanel.hide();
   deleteBtn.disabled = true;
   worldSettingsPanel.refresh();
@@ -519,17 +467,10 @@ function loop(): void {
   if (controls.isRunning()) {
     const settings = physicsWorld.getSettings();
     applyEmForces(physicsWorld.world, settings, simTime, settings.timeStep, emBodyState);
-    applyForceLinks(forceLinks);
     physicsWorld.step();
     simTime += settings.timeStep;
   }
-  const selectTool = inputHandler.getSelectTool();
-  renderer.draw(
-    physicsWorld.world,
-    selectTool.getSelectedJoint(),
-    forceLinks,
-    selectTool.getSelectedForceLink(),
-  );
+  renderer.draw(physicsWorld.world, inputHandler.getSelectTool().getSelectedJoint());
   inputHandler.drawPreview();
   propertiesPanel.refresh();
   requestAnimationFrame(loop);

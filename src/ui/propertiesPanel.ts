@@ -1,6 +1,5 @@
 import * as planck from 'planck';
 import { BodyUserData } from '../types/userData';
-import { ForceLink } from '../physics/forceLinks';
 
 /** Human-readable labels for each joint type. */
 const JOINT_TYPE_LABELS: Record<string, string> = {
@@ -51,9 +50,8 @@ const DEFAULT_EM: NonNullable<BodyUserData['em']> = {
 
 export class PropertiesPanel {
   private container: HTMLElement;
-  private currentBody:       planck.Body  | null = null;
-  private currentJoint:      planck.Joint | null = null;
-  private currentForceLink:  ForceLink    | null = null;
+  private currentBody:  planck.Body  | null = null;
+  private currentJoint: planck.Joint | null = null;
   private onBeforeChange: (() => void) | null;
 
   constructor(container: HTMLElement, onBeforeChange: (() => void) | null = null) {
@@ -70,25 +68,15 @@ export class PropertiesPanel {
   }
 
   showJoint(joint: planck.Joint): void {
-    this.currentBody      = null;
-    this.currentJoint     = joint;
-    this.currentForceLink = null;
+    this.currentBody  = null;
+    this.currentJoint = joint;
     this.rebuildJoint();
     this.container.style.display = 'flex';
   }
 
-  showForceLink(link: ForceLink, onDelete: () => void): void {
-    this.currentBody      = null;
-    this.currentJoint     = null;
-    this.currentForceLink = link;
-    this.rebuildForceLink(link, onDelete);
-    this.container.style.display = 'flex';
-  }
-
   hide(): void {
-    this.currentBody      = null;
-    this.currentJoint     = null;
-    this.currentForceLink = null;
+    this.currentBody  = null;
+    this.currentJoint = null;
     this.container.style.display = 'none';
     this.container.innerHTML = '';
   }
@@ -214,57 +202,6 @@ export class PropertiesPanel {
       case 'gear-joint':      this.buildGearJointSection(joint as planck.GearJoint);          break;
       // revolute-joint, weld-joint, prismatic-joint: no additional fields
     }
-  }
-
-  // ── Force link panel ──────────────────────────────────────────────────────
-
-  private rebuildForceLink(link: ForceLink, onDelete: () => void): void {
-    this.container.innerHTML = '';
-    this.addHeading('Force Link Properties');
-
-    // ── Help text ────────────────────────────────────────────────────────────
-
-    const desc = document.createElement('div');
-    desc.style.cssText = 'font-size:10px;color:#aaa;padding:2px 0 6px;line-height:1.5;';
-    desc.textContent = 'F = k · (r − L₀)ⁿ   positive k = attractive';
-    this.container.appendChild(desc);
-
-    this.addSeparator();
-
-    // ── Parameters ──────────────────────────────────────────────────────────
-
-    this.addNumberField('Coefficient k', link.coefficient, null, (val) => {
-      this.onBeforeChange?.();
-      link.coefficient = val;
-    });
-    this.addNumberField('Exponent n', link.exponent, null, (val) => {
-      this.onBeforeChange?.();
-      link.exponent = val;
-    });
-    this.addNumberField('Rest Length L₀ (m)', link.restLength, 0, (val) => {
-      this.onBeforeChange?.();
-      link.restLength = val;
-    });
-    this.addNumberField('Min Distance (m)', link.minDistance, 0.0001, (val) => {
-      this.onBeforeChange?.();
-      link.minDistance = val;
-    });
-    this.addNumberField('Max Distance (m, 0 = ∞)', link.maxDistance, 0, (val) => {
-      this.onBeforeChange?.();
-      link.maxDistance = val;
-    });
-
-    this.addSeparator();
-
-    // ── Delete button ────────────────────────────────────────────────────────
-
-    const delBtn = document.createElement('button');
-    delBtn.textContent = '🗑 Delete Force Link';
-    delBtn.style.cssText =
-      'width:100%;background:#3a1a1a;color:#e88;border:1px solid #844;' +
-      'border-radius:3px;padding:5px 8px;cursor:pointer;font-size:11px;margin-top:4px;';
-    delBtn.addEventListener('click', onDelete);
-    this.container.appendChild(delBtn);
   }
 
   private buildDistanceJointSection(joint: planck.DistanceJoint): void {

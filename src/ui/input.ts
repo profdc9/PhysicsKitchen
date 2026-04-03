@@ -4,8 +4,6 @@ import { Toolbar, ToolType } from './toolbar';
 import { StatusBar } from './statusbar';
 import { SelectTool } from './selectTool';
 import { JointTool, JointToolType } from './jointTool';
-import { ForceLinkTool } from './forceLinkTool';
-import { ForceLink } from '../physics/forceLinks';
 import { BodyUserData } from '../types/userData';
 
 // Default physical properties for newly placed bodies
@@ -46,9 +44,6 @@ const JOINT_TOOLS = new Set<ToolType>([
   'friction-joint', 'motor-joint',
 ]);
 
-// Force tool type names for routing
-const FORCE_TOOLS = new Set<ToolType>(['force-link']);
-
 export class InputHandler {
   private canvas: HTMLCanvasElement;
   private world: planck.World;
@@ -59,7 +54,6 @@ export class InputHandler {
   private previewFn: (() => void) | null = null;
   private selectTool: SelectTool;
   private jointTool: JointTool;
-  private forceLinkTool: ForceLinkTool;
   private onBeforeChange: (() => void) | null;
 
   // Stored so they can be removed in destroy()
@@ -75,8 +69,7 @@ export class InputHandler {
     toolbar: Toolbar,
     statusBar: StatusBar,
     isSimulationRunning: () => boolean,
-    onBeforeChange: (() => void) | null = null,
-    onForceLinkCommit: ((link: ForceLink) => void) | null = null,
+    onBeforeChange: (() => void) | null = null
   ) {
     this.canvas = canvas;
     this.world = world;
@@ -84,12 +77,10 @@ export class InputHandler {
     this.toolbar = toolbar;
     this.statusBar = statusBar;
     this.onBeforeChange = onBeforeChange;
-    this.selectTool    = new SelectTool(world, renderer, isSimulationRunning, onBeforeChange);
-    this.jointTool     = new JointTool(world, renderer);
+    this.selectTool = new SelectTool(world, renderer, isSimulationRunning, onBeforeChange);
+    this.jointTool  = new JointTool(world, renderer);
     this.jointTool.setOnBeforeChange(onBeforeChange);
     this.jointTool.onStatusChange((text) => this.statusBar.set(text));
-    this.forceLinkTool = new ForceLinkTool(world, renderer, onForceLinkCommit ?? (() => {}));
-    this.forceLinkTool.onStatusChange((text) => this.statusBar.set(text));
 
     this.toolbar.onChange((tool) => this.onToolChanged(tool));
     this.onToolChanged(this.toolbar.getCurrentTool());
@@ -121,17 +112,10 @@ export class InputHandler {
     return this.jointTool;
   }
 
-  getForceLinkTool(): ForceLinkTool {
-    return this.forceLinkTool;
-  }
-
   /** Called each frame by the render loop to draw selection highlights and placement previews. */
   drawPreview(): void {
     this.selectTool.drawSelection();
     this.jointTool.drawPreview();
-    if (this.toolbar.getCurrentTool() === 'force-link') {
-      this.forceLinkTool.drawPreview();
-    }
     if (this.previewFn) this.previewFn();
   }
 
@@ -147,13 +131,8 @@ export class InputHandler {
 
     if (JOINT_TOOLS.has(tool)) {
       this.jointTool.activate(tool as JointToolType);
-      this.forceLinkTool.deactivate();
-    } else if (FORCE_TOOLS.has(tool)) {
-      this.jointTool.deactivate();
-      this.forceLinkTool.activate();
     } else {
       this.jointTool.deactivate();
-      this.forceLinkTool.deactivate();
       this.updateStatusBar(tool);
     }
   }
@@ -182,11 +161,6 @@ export class InputHandler {
       // Only consume the event if the joint tool actually used it (axis drag start).
       // For all other joint phases, onMouseDown is a no-op and returns false.
       if (this.jointTool.onMouseDown(wp, cp, e.ctrlKey)) return;
-    }
-
-    if (tool === 'force-link') {
-      this.forceLinkTool.onMouseDown(cp);
-      return;
     }
 
     switch (tool) {
@@ -225,11 +199,6 @@ export class InputHandler {
 
     if (JOINT_TOOLS.has(tool)) {
       this.jointTool.onMouseMove(wp, cp, e.ctrlKey, e.shiftKey);
-      return;
-    }
-
-    if (tool === 'force-link') {
-      this.forceLinkTool.onMouseMove(cp);
       return;
     }
 
