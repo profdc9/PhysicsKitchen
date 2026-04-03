@@ -23,7 +23,10 @@ function resizeCanvas(): void {
   canvas.height = Math.round(rect.height);
 }
 resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+// ResizeObserver fires for any layout change that affects the canvas size — including
+// the status bar appearing on first interaction, panels opening, and window resizes.
+// window.resize alone misses internal layout shifts, causing a buffer/display mismatch.
+new ResizeObserver(resizeCanvas).observe(canvas);
 
 // --- Physics setup ---
 let physicsWorld = new PhysicsWorld(DEFAULT_WORLD_SETTINGS);

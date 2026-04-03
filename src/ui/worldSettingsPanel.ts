@@ -26,6 +26,7 @@ export class WorldSettingsPanel {
     this.container     = container;
     this.getSettings   = getSettings;
     this.applySettings = applySettings;
+    this.hide(); // seed inline style so isVisible() works correctly from the start
   }
 
   /** Show the panel and rebuild its contents from current settings. */

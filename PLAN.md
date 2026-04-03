@@ -72,7 +72,12 @@ Applied each simulation step via `applyEmForces()` in `src/physics/emForces.ts`,
 - Joints that previously had no editable fields (revolute, weld, prismatic, pulley) now show this field.
 - Writes directly to `joint.m_collideConnected`; planck.js contact filter picks it up on the next contact evaluation.
 
+### 10. Bug fixes ✓
+- **Canvas/world coordinate mismatch (27 px Y offset):** `resizeCanvas()` ran before the status bar rendered, setting `canvas.height = 882` while the displayed height was 855. `window.resize` never fired to correct it. Fixed by replacing `window.addEventListener('resize', resizeCanvas)` with `new ResizeObserver(resizeCanvas).observe(canvas)`, which fires for any layout change including internal shifts.
+- **World Settings panel requires two clicks to open:** `isVisible()` checks `style.display !== 'none'`, but the initial inline style is `''` not `'none'`, so the first click always hid rather than showed the panel. Fixed by calling `this.hide()` in the `WorldSettingsPanel` constructor to seed the inline style, matching the pattern used by `PropertiesPanel`.
+
 ## Notes
 - Do NOT rebuild panel DOM every frame (breaks color pickers). Build once on selection; update `.value` only for live fields.
 - All UI distances (handle sizes, hit zones, snap thresholds) are in pixels, not world units.
 - `body.getWorldCenter()` does not exist in this planck.js build — use `body.getPosition()`.
+- Always seed panel visibility via `this.hide()` in the constructor so `isVisible()` works correctly from the first interaction.
