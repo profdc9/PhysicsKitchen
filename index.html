@@ -145,11 +145,31 @@
         margin: 0 4px;
       }
 
-      /* ── Main area: sidebar + canvas ── */
+      /* ── Main area: sidebar + right column ── */
       #main {
         display: flex;
         flex: 1;
         overflow: hidden;
+      }
+
+      /* ── Right column: secondary bar + canvas ── */
+      #right-column {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* ── Secondary toolbar row (below primary, right of sidebar) ── */
+      #secondary-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background: #222;
+        border-bottom: 1px solid #444;
+        flex-shrink: 0;
+        flex-wrap: wrap;
       }
 
       /* ── Left sidebar: shape + joint tools ── */
@@ -469,10 +489,13 @@ THE SOFTWARE.</pre>
 
     <div id="main">
       <div id="sidebar"></div>
-      <div id="canvas-container">
-        <canvas id="simulation-canvas"></canvas>
-        <div id="world-settings-panel"></div>
-        <div id="properties-panel"></div>
+      <div id="right-column">
+        <div id="secondary-bar"></div>
+        <div id="canvas-container">
+          <canvas id="simulation-canvas"></canvas>
+          <div id="world-settings-panel"></div>
+          <div id="properties-panel"></div>
+        </div>
       </div>
     </div>
     <div id="status-bar"></div>

@@ -101,6 +101,7 @@ const renderer = new Renderer(canvas, DEFAULT_RENDER_SETTINGS);
 
 // --- Build UI ---
 const topBarEl    = document.getElementById('top-bar') as HTMLElement;
+const secondaryBarEl = document.getElementById('secondary-bar') as HTMLElement;
 const sidebarEl   = document.getElementById('sidebar') as HTMLElement;
 const statusBarEl = document.getElementById('status-bar') as HTMLElement;
 const propsPanelEl        = document.getElementById('properties-panel') as HTMLElement;
@@ -177,7 +178,7 @@ function makeVisibilityToggle(label: string): { wrapper: HTMLElement; checkbox: 
   checkbox.checked = true;
   wrapper.appendChild(checkbox);
   wrapper.appendChild(document.createTextNode(label));
-  topBarEl.appendChild(wrapper);
+  secondaryBarEl.appendChild(wrapper);
   return { wrapper, checkbox };
 }
 
@@ -319,7 +320,7 @@ saveBtn.addEventListener('click', async () => {
     alert(inTauri ? 'Could not save file.' : 'Could not write to clipboard. Please check browser permissions.');
   }
 });
-topBarEl.appendChild(saveBtn);
+secondaryBarEl.appendChild(saveBtn);
 
 // Open / Load button — file dialog in Tauri, clipboard in browser
 const loadBtn = document.createElement('button');
@@ -343,14 +344,14 @@ loadBtn.addEventListener('click', async () => {
   if (json === null) return;   // user cancelled the file dialog
   loadSceneFromJson(json);
 });
-topBarEl.appendChild(loadBtn);
+secondaryBarEl.appendChild(loadBtn);
 
 // About button
 const aboutBtn = document.createElement('button');
 aboutBtn.className = 'top-btn';
 aboutBtn.textContent = 'ℹ About';
 aboutBtn.addEventListener('click', () => aboutDialog.showModal());
-topBarEl.appendChild(aboutBtn);
+secondaryBarEl.appendChild(aboutBtn);
 
 document.getElementById('about-close-btn')!
   .addEventListener('click', () => aboutDialog.close());
