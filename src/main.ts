@@ -10,6 +10,7 @@ import { InputHandler } from './ui/input';
 import { PropertiesPanel } from './ui/propertiesPanel';
 import { WorldSettingsPanel } from './ui/worldSettingsPanel';
 import { attachHint } from './ui/hoverHint';
+import { isTauriApp, saveScene, loadScene } from './platform/fileIo';
 import { playCollisionSound } from './audio/collisionSound';
 import { applyEmForces, EmBodyState } from './physics/emForces';
 import { BodyUserData } from './types/userData';
@@ -293,36 +294,53 @@ function loadSceneFromJson(json: string): void {
   updateUndoRedoButtons();
 }
 
-// Copy scene: serialize current state to JSON and write to clipboard
-const copyBtn = document.createElement('button');
-copyBtn.className = 'top-btn';
-copyBtn.textContent = '📋 Copy';
-attachHint(copyBtn, 'Copy scene — serialize the entire scene to JSON and copy to clipboard', statusBar);
-copyBtn.addEventListener('click', async () => {
+// Save / Copy button — file dialog in Tauri, clipboard in browser
+const saveBtn = document.createElement('button');
+saveBtn.className = 'top-btn';
+const inTauri = isTauriApp();
+saveBtn.textContent = inTauri ? '💾 Save' : '📋 Copy';
+attachHint(
+  saveBtn,
+  inTauri
+    ? 'Save scene — save the current scene to a file'
+    : 'Copy scene — serialize the entire scene to JSON and copy to clipboard',
+  statusBar,
+);
+saveBtn.addEventListener('click', async () => {
   const json = serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime);
   try {
-    await navigator.clipboard.writeText(json);
-    copyBtn.textContent = '✓ Copied';
-    setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
+    const saved = await saveScene(json);
+    if (saved && !inTauri) {
+      // Browser: give a brief visual confirmation
+      saveBtn.textContent = '✓ Copied';
+      setTimeout(() => { saveBtn.textContent = '📋 Copy'; }, 1500);
+    }
   } catch {
-    alert('Could not write to clipboard. Please check browser permissions.');
+    alert(inTauri ? 'Could not save file.' : 'Could not write to clipboard. Please check browser permissions.');
   }
 });
-topBarEl.appendChild(copyBtn);
+topBarEl.appendChild(saveBtn);
 
-// Load scene: read JSON from clipboard and replace the current simulation
+// Open / Load button — file dialog in Tauri, clipboard in browser
 const loadBtn = document.createElement('button');
 loadBtn.className = 'top-btn';
-loadBtn.textContent = '📂 Load';
-attachHint(loadBtn, 'Load scene — paste a scene from the clipboard and replace the current simulation', statusBar);
+loadBtn.textContent = inTauri ? '📂 Open' : '📂 Load';
+attachHint(
+  loadBtn,
+  inTauri
+    ? 'Open scene — load a scene from a file'
+    : 'Load scene — paste a scene from the clipboard and replace the current simulation',
+  statusBar,
+);
 loadBtn.addEventListener('click', async () => {
-  let json: string;
+  let json: string | null;
   try {
-    json = await navigator.clipboard.readText();
+    json = await loadScene();
   } catch {
-    alert('Could not read from clipboard. Please check browser permissions.');
+    alert(inTauri ? 'Could not open file.' : 'Could not read from clipboard. Please check browser permissions.');
     return;
   }
+  if (json === null) return;   // user cancelled the file dialog
   loadSceneFromJson(json);
 });
 topBarEl.appendChild(loadBtn);
