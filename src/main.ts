@@ -91,7 +91,7 @@ let emBodyState = new Map<planck.Body, EmBodyState>();
  * Call this BEFORE applying any user-initiated change so the previous state is saved.
  */
 function commitUndo(): void {
-  undoStack.push(serializeScene(physicsWorld.world, physicsWorld.getSettings()));
+  undoStack.push(serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime));
   updateUndoRedoButtons();
 }
 
@@ -240,7 +240,7 @@ function restoreScene(json: string): void {
   physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
   registerJointCascade(physicsWorld.world);
   registerCollisionSounds(physicsWorld);
-  simTime    = 0;
+  simTime     = result.simTime;
   emBodyState = new Map();
   propertiesPanel.hide();
   deleteBtn.disabled = true;
@@ -251,7 +251,7 @@ function restoreScene(json: string): void {
 }
 
 function performUndo(): void {
-  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings());
+  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime);
   const prevJson = undoStack.undo(currentJson);
   if (!prevJson) return;
   controls.pause();
@@ -259,7 +259,7 @@ function performUndo(): void {
 }
 
 function performRedo(): void {
-  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings());
+  const currentJson = serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime);
   const nextJson = undoStack.redo(currentJson);
   if (!nextJson) return;
   controls.pause();
@@ -271,7 +271,7 @@ function performRedo(): void {
  * Clears undo history, hides the properties panel, and rebuilds the input handler.
  */
 function loadSceneFromJson(json: string): void {
-  let result: { world: planck.World; settings: WorldSettings };
+  let result: { world: planck.World; settings: WorldSettings; simTime: number };
   try {
     result = deserializeScene(json);
   } catch (err) {
@@ -283,7 +283,7 @@ function loadSceneFromJson(json: string): void {
   physicsWorld = PhysicsWorld.fromWorld(result.world, result.settings);
   registerJointCascade(physicsWorld.world);
   registerCollisionSounds(physicsWorld);
-  simTime    = 0;
+  simTime     = result.simTime;
   emBodyState = new Map();
   propertiesPanel.hide();
   deleteBtn.disabled = true;
@@ -299,7 +299,7 @@ copyBtn.className = 'top-btn';
 copyBtn.textContent = '📋 Copy';
 attachHint(copyBtn, 'Copy scene — serialize the entire scene to JSON and copy to clipboard', statusBar);
 copyBtn.addEventListener('click', async () => {
-  const json = serializeScene(physicsWorld.world, physicsWorld.getSettings());
+  const json = serializeScene(physicsWorld.world, physicsWorld.getSettings(), simTime);
   try {
     await navigator.clipboard.writeText(json);
     copyBtn.textContent = '✓ Copied';
@@ -534,7 +534,7 @@ function loop(): void {
     physicsWorld.step();
     simTime += settings.timeStep;
   }
-  renderer.draw(physicsWorld.world, inputHandler.getSelectTool().getSelectedJoint());
+  renderer.draw(physicsWorld.world, inputHandler.getSelectTool().getSelectedJoint(), simTime);
   inputHandler.drawPreview();
   propertiesPanel.refresh();
   requestAnimationFrame(loop);

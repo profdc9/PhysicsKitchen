@@ -6,15 +6,16 @@ const GRID_LINE_COLOR   = 'rgba(255, 255, 255, 0.07)';
 const AXIS_LINE_COLOR   = 'rgba(255, 255, 255, 0.20)';   // origin axes slightly brighter
 const GRID_LINE_WIDTH   = 1;
 
-// ── Scale bar style (lower-left canvas overlay) ───────────────────────────────
+// ── Scale bar + sim-time style (lower-left canvas overlay) ───────────────────
 
-const SCALE_BAR_MARGIN_X = 14;   // px from left edge
-const SCALE_BAR_MARGIN_Y = 14;   // px from bottom edge
-const SCALE_BAR_HEIGHT   = 6;    // px — tick cap height on each end
-const SCALE_TEXT_FONT    = '11px monospace';
-const SCALE_TEXT_COLOR   = 'rgba(200, 200, 220, 0.85)';
-const SCALE_LINE_COLOR   = 'rgba(200, 200, 220, 0.70)';
-const SCALE_LINE_WIDTH   = 1.5;
+const SCALE_BAR_MARGIN_X   = 14;   // px from left edge
+const SCALE_BAR_MARGIN_Y   = 14;   // px from bottom edge when no sim-time below
+const SCALE_BAR_WITH_TIME_Y = 34;  // px from bottom edge when sim-time is shown below
+const SCALE_BAR_HEIGHT     = 6;    // px — tick cap height on each end
+const SCALE_TEXT_FONT      = '11px monospace';
+const SCALE_TEXT_COLOR     = 'rgba(200, 200, 220, 0.85)';
+const SCALE_LINE_COLOR     = 'rgba(200, 200, 220, 0.70)';
+const SCALE_LINE_WIDTH     = 1.5;
 
 // ── Nice-number grid spacing ──────────────────────────────────────────────────
 
@@ -103,11 +104,12 @@ export function drawGrid(
 
 /**
  * Draw a scale bar in the lower-left corner showing the current grid spacing.
- * Call this AFTER drawing bodies/joints so it sits on top.
+ * @param aboveSimTime  When true, shift the bar up to leave room for the sim-time below.
  */
 export function drawGridScale(
   ctx: CanvasRenderingContext2D,
   renderer: Renderer,
+  aboveSimTime: boolean = true,
 ): void {
   const canvas = renderer.getCanvas();
   const w = canvas.width;
@@ -119,36 +121,63 @@ export function drawGridScale(
 
   const x1 = SCALE_BAR_MARGIN_X;
   const x2 = x1 + barPx;
-  const y  = h - SCALE_BAR_MARGIN_Y;
+  const y  = h - (aboveSimTime ? SCALE_BAR_WITH_TIME_Y : SCALE_BAR_MARGIN_Y);
 
   ctx.save();
   ctx.strokeStyle = SCALE_LINE_COLOR;
   ctx.lineWidth   = SCALE_LINE_WIDTH;
 
-  // Horizontal bar
   ctx.beginPath();
   ctx.moveTo(x1, y);
   ctx.lineTo(x2, y);
   ctx.stroke();
 
-  // Left cap
   ctx.beginPath();
   ctx.moveTo(x1, y - SCALE_BAR_HEIGHT / 2);
   ctx.lineTo(x1, y + SCALE_BAR_HEIGHT / 2);
   ctx.stroke();
 
-  // Right cap
   ctx.beginPath();
   ctx.moveTo(x2, y - SCALE_BAR_HEIGHT / 2);
   ctx.lineTo(x2, y + SCALE_BAR_HEIGHT / 2);
   ctx.stroke();
 
-  // Label centred above the bar
   ctx.fillStyle    = SCALE_TEXT_COLOR;
   ctx.font         = SCALE_TEXT_FONT;
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'bottom';
   ctx.fillText(formatSpacing(spacing), (x1 + x2) / 2, y - SCALE_BAR_HEIGHT / 2 - 2);
 
+  ctx.restore();
+}
+
+/** Format elapsed simulation seconds as a readable string. */
+function formatSimTime(seconds: number): string {
+  if (seconds < 100)  return `t = ${seconds.toFixed(2)} s`;
+  if (seconds < 1000) return `t = ${seconds.toFixed(1)} s`;
+  return `t = ${seconds.toFixed(0)} s`;
+}
+
+/**
+ * Draw the elapsed simulation time in the lower-left corner.
+ * @param gridVisible  When true, positions the label above the scale bar slot;
+ *                     when false, uses the bottom margin directly.
+ */
+export function drawSimTime(
+  ctx: CanvasRenderingContext2D,
+  renderer: Renderer,
+  simTime: number,
+  gridVisible: boolean,
+): void {
+  const canvas = renderer.getCanvas();
+  const h = canvas.height;
+  const y = h - SCALE_BAR_MARGIN_Y;
+
+  ctx.save();
+  ctx.font         = SCALE_TEXT_FONT;
+  ctx.fillStyle    = SCALE_TEXT_COLOR;
+  ctx.textAlign    = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(formatSimTime(simTime), SCALE_BAR_MARGIN_X, y + 2);
   ctx.restore();
 }

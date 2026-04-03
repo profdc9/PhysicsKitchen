@@ -7,6 +7,8 @@ interface SceneFile {
   version: number;
   settings: WorldSettings;
   physics: planck.SerializedType;
+  /** Accumulated simulation time (seconds); absent in older saves treated as 0. */
+  simTime?: number;
 }
 
 const FILE_VERSION = 1;
@@ -46,21 +48,30 @@ const sceneSerializer = new planck.Serializer<planck.World>({
  * Serialize the entire simulation state — physics world, world settings,
  * and all custom body properties — to a human-readable JSON string.
  */
-export function serializeScene(world: planck.World, settings: WorldSettings): string {
+export function serializeScene(
+  world: planck.World,
+  settings: WorldSettings,
+  simTime: number = 0,
+): string {
   const file: SceneFile = {
     version: FILE_VERSION,
     settings,
     physics: sceneSerializer.toJson(world),
+    simTime,
   };
   return JSON.stringify(file, null, 2);
 }
 
 /**
  * Deserialize a scene JSON string produced by serializeScene.
- * Returns the restored planck.World and WorldSettings.
+ * Returns the restored planck.World, WorldSettings, and simTime.
  * Throws a descriptive Error if the JSON is invalid or the version is unsupported.
  */
-export function deserializeScene(json: string): { world: planck.World; settings: WorldSettings } {
+export function deserializeScene(json: string): {
+  world: planck.World;
+  settings: WorldSettings;
+  simTime: number;
+} {
   let file: SceneFile;
   try {
     file = JSON.parse(json) as SceneFile;
@@ -74,5 +85,5 @@ export function deserializeScene(json: string): { world: planck.World; settings:
     throw new Error('Invalid scene file: missing "settings" or "physics" field.');
   }
   const world = sceneSerializer.fromJson(file.physics);
-  return { world, settings: file.settings };
+  return { world, settings: file.settings, simTime: file.simTime ?? 0 };
 }

@@ -1,7 +1,7 @@
 import * as planck from 'planck';
 import { drawBodies, drawBodyNames } from './bodies';
 import { drawJoints } from './joints';
-import { drawGrid, drawGridScale } from './grid';
+import { drawGrid, drawGridScale, drawSimTime } from './grid';
 
 // Initial pixels per meter — can be changed by zooming
 const DEFAULT_PIXELS_PER_METER = 50;
@@ -111,7 +111,7 @@ export class Renderer {
   }
 
   /** Clear the canvas and draw all world objects. */
-  draw(world: planck.World, selectedJoint: planck.Joint | null = null): void {
+  draw(world: planck.World, selectedJoint: planck.Joint | null = null, simTime: number = 0): void {
     this.clear();
 
     this.ctx.save();
@@ -132,10 +132,11 @@ export class Renderer {
       drawBodyNames(this.ctx, world, this);
     }
 
-    // Scale bar always drawn on top when grid is visible
+    // Scale bar and sim-time drawn on top — scale bar only when grid is visible
     if (this.settings.showGrid) {
       drawGridScale(this.ctx, this);
     }
+    drawSimTime(this.ctx, this, simTime, this.settings.showGrid);
 
     this.ctx.restore();
   }
