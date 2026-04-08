@@ -1,0 +1,1 @@
+import{t as e}from"./index-BDwRtXpR.js";import{n as t,t as n}from"./core-B71_GLYL.js";async function r(e={}){return typeof e==`object`&&Object.freeze(e),await t(`plugin:dialog|open`,{options:e})}async function i(e={}){return typeof e==`object`&&Object.freeze(e),await t(`plugin:dialog|save`,{options:e})}e((()=>{n()}))();export{r as open,i as save};

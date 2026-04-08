@@ -1,0 +1,1 @@
+import{t as e}from"./index-BDwRtXpR.js";var t=e((()=>{}));async function n(e,t={},n){return window.__TAURI_INTERNALS__.invoke(e,t,n)}var r=e((()=>{t()}));export{n,r as t};
